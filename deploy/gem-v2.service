@@ -1,0 +1,29 @@
+[Unit]
+Description=Gem v2 game server (璀璨宝石)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/workspace/project/gem-v2
+Environment=HOME=/root
+# 只监听回环：对外由 nginx 的 9095 提供，见 deploy/nginx/gem.conf。
+Environment=GEM_ADDR=127.0.0.1:9096
+Environment=GEM_DB=/var/lib/gem-v2/gem.db
+# 静态资源由 nginx 发，Go 只提供 API/WS。
+Environment=GEM_STATIC=
+EnvironmentFile=-/etc/gem-v2.env
+StateDirectory=gem-v2
+StateDirectoryMode=0700
+ExecStart=/root/workspace/project/gem-v2/dist/bin/gem-server
+Restart=always
+RestartSec=3
+# 独立于 user.slice：不受 IDE 的 CPU/内存限额与 OOM 牵连
+Slice=system.slice
+CPUWeight=500
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

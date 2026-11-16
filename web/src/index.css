@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .btn {
+    @apply inline-flex min-h-[44px] min-w-[44px] items-center justify-center px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed transition;
+  }
+  .btn-primary {
+    @apply inline-flex min-h-[44px] min-w-[44px] items-center justify-center px-3 py-1.5 rounded bg-sky-600 hover:bg-sky-500 font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition;
+  }
+  .btn-danger {
+    @apply inline-flex min-h-[44px] min-w-[44px] items-center justify-center px-3 py-1.5 rounded bg-rose-700 hover:bg-rose-600 disabled:opacity-40 transition;
+  }
+  .input {
+    @apply min-h-[44px] min-w-0 max-w-full px-2 py-1.5 rounded bg-slate-800 border border-slate-600 focus:outline-none focus:border-sky-400;
+  }
+  .card {
+    @apply min-w-0 rounded-xl bg-slate-800/70 border border-slate-700 p-3 sm:p-4;
+  }
+}
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    'PingFang SC',
+    'Microsoft YaHei',
+    sans-serif;
+}
+
+button,
+a,
+input,
+select,
+summary {
+  touch-action: manipulation;
+}
+
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible,
+[role='button']:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+.app-main {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+.result-dialog {
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 639px) {
+  .input {
+    /* 防止 iOS 聚焦输入框时自动放大页面。 */
+    font-size: 16px;
+  }
+}
