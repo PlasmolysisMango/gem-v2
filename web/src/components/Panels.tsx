@@ -1,53 +1,150 @@
-import { useEffect, useRef, useState } from 'react'
-import type { ChatMessage, CurvePoint, GameEvent, GameOver, MoveReview, RoomState, View } from '../api/types'
-import { pct, total } from '../lib/gems'
-import { seatLabel } from './GameBoard'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import type { Card, ChatMessage, CurvePoint, GameEvent, GameOver, MoveEvent, MoveReview, RoomState, View } from '../api/types'
+import { pct, seatLabel, total } from '../lib/gems'
 import { ReviewBadge } from './HintPanel'
-import { CardTile, NobleTile, TokenRow } from './Pieces'
+import { CardTile, MoveIcons, TokenRow, useCardCatalog } from './Pieces'
 
-export function PlayerPanel({ view, room, seat }: { view: View; room: RoomState | null; seat: number }) {
+/** 按人数设置平板列数；PC 左栏单列，手机优先两列。 */
+export const PANEL_COLS: Record<number, string> = { 1: 'lg:grid-cols-1', 2: 'lg:grid-cols-2', 3: 'sm:grid-cols-3', 4: 'lg:grid-cols-4' }
+
+/** 玩家资源和上一回合。手机折叠对手预留卡；我方预留卡由棋盘提供购买入口。 */
+export function PlayerPanel({
+  view,
+  room,
+  seat,
+  lastMove,
+  compact,
+  moveEvents,
+  own,
+  onInspectReserved,
+}: {
+  view: View
+  room: RoomState | null
+  seat: number
+  lastMove?: string
+  compact?: boolean
+  moveEvents?: MoveEvent[]
+  own?: boolean
+  onInspectReserved?: (card?: Card) => void
+}) {
+  const [detail, setDetail] = useState<{ card?: Card } | null>(null)
   const p = view.players[seat]
   const info = room?.seats[seat]
   const active = view.current === seat && view.phase !== 'over'
   const winner = view.winners.includes(seat)
+  const cards = useCardCatalog()
+  const visibleCards = [...cards, ...view.board.flat().filter((c): c is NonNullable<typeof c> => c !== null), ...p.reserved]
+  const canInspect = !own || compact
+  const inspect = (card?: Card) => {
+    if (onInspectReserved) onInspectReserved(card)
+    else setDetail({ card })
+  }
   return (
-    <div className={`rounded-lg p-2 border-2 ${active ? 'border-yellow-400 bg-slate-800' : 'border-slate-700 bg-slate-800/50'}`}>
+    <div
+      className={`min-w-0 rounded-lg border-2 ${compact ? 'p-1.5' : 'p-2'} ${own ? 'h-full' : ''}
+        ${active ? 'border-yellow-400 bg-slate-800' : 'border-slate-700 bg-slate-800/50'}`}
+    >
       <div className="flex justify-between items-start gap-2">
-        <span className="min-w-0 break-words font-semibold">
-          {seatLabel(room, seat)}
+        <span className={`min-w-0 break-words font-semibold ${compact ? 'text-sm leading-tight' : ''}`}>
+          {own ? '我方 · ' : ''}{seatLabel(room, seat)}
           {seat === view.viewer && <span className="text-xs text-sky-300"> (你)</span>}
           {info?.bot && <span className="text-xs text-amber-300"> 托管中</span>}
           {info && info.kind === 'human' && !info.connected && <span className="text-xs text-rose-300"> 离线</span>}
           {winner && <span className="text-xs text-yellow-300"> 🏆</span>}
         </span>
-        <span className="shrink-0 text-2xl font-black text-yellow-300">{p.points}</span>
+        <span className={`shrink-0 font-black leading-none text-yellow-300 ${compact ? 'text-xl' : 'text-2xl'}`} aria-label={`${p.points} 分`}>{p.points}<span className="text-[10px] font-normal ml-0.5">分</span></span>
       </div>
-      <TokenRow tokens={p.tokens} bonuses={p.bonuses} />
-      <div className="text-xs text-slate-400 mt-1">
-        筹码 {total(p.tokens)} · 卡 {p.nCards} · 预留 {p.reserved.length}
+      <TokenRow tokens={p.tokens} bonuses={p.bonuses} dense={compact} />
+      <div className={`flex items-center justify-evenly gap-1 whitespace-nowrap border-t border-slate-700/60 py-1 ${compact ? 'text-[10px]' : 'text-xs'} text-slate-400`}>
+        <span>卡<span className="ml-0.5 font-bold text-slate-100">{p.nCards}</span></span>
+        <span>筹码<span className="ml-0.5 font-bold text-slate-100">{total(p.tokens)}</span>/10</span>
+        {canInspect ? (
+          <button type="button" className="min-h-[32px] rounded px-1 text-sky-300 hover:bg-slate-700 disabled:text-slate-500"
+            aria-haspopup="dialog" aria-label={`查看${seatLabel(room, seat)}预留卡（${p.reserved.length}/3）`}
+            disabled={p.reserved.length === 0} onClick={() => inspect()}>
+            预留<span className="ml-0.5 font-bold">{p.reserved.length}</span>/3
+          </button>
+        ) : <span>预留<span className="ml-0.5 font-bold text-slate-100">{p.reserved.length}</span>/3</span>}
+        {p.nobles.length > 0 && <span className="text-amber-300">贵族{p.nobles.length}</span>}
       </div>
-      {seat !== view.viewer && p.reserved.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1">
-          {p.reserved.map((c, i) => (
-            <CardTile key={i} card={c} small />
-          ))}
-        </div>
-      )}
-      {p.nobles.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1">
-          {p.nobles.map((id) => {
-            const n = { id, points: 3, req: [0, 0, 0, 0, 0] }
-            return <NobleTile key={id} noble={n} small />
-          })}
-        </div>
+      <div className="flex min-w-0 items-center gap-1 border-t border-slate-700/60 pt-1 text-xs text-slate-200" title={lastMove}
+        aria-label={`${seatLabel(room, seat)}上一步：${lastMove ?? '尚未行动'}`}>
+        <span className="shrink-0 text-[10px] text-slate-500">上一步</span>
+        {moveEvents?.length ? <MoveIcons events={moveEvents} cards={visibleCards} compact={compact} onReserveClick={canInspect ? inspect : undefined} /> : <span className="min-w-0 break-words">{lastMove ?? '—'}</span>}
+      </div>
+      {detail && (
+        <PanelDialog title={`${seatLabel(room, seat)} · 预留详情`} onClose={() => setDetail(null)}>
+          <div className="grid grid-cols-3 gap-2" aria-label="预留卡详情">
+            {(detail.card ? [detail.card] : p.reserved).map((c, i) => (
+              <div key={i} className="h-32"><CardTile card={c} fluid /></div>
+            ))}
+          </div>
+        </PanelDialog>
       )}
     </div>
   )
 }
 
-export function EventLog({ log }: { log: GameEvent[] }) {
+/** 日志和预留详情共用弹层，支持 Esc、遮罩关闭及键盘焦点恢复。 */
+export function PanelDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  const titleId = useId()
+  const dialog = useRef<HTMLDivElement>(null)
+  const close = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    const previous = document.activeElement
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    close.current?.focus()
+    return () => {
+      document.body.style.overflow = overflow
+      if (previous instanceof HTMLElement) previous.focus()
+    }
+  }, [])
   return (
-    <div className="h-64 xl:h-48 min-w-0 overflow-y-auto break-words text-sm xl:text-xs space-y-0.5 font-mono bg-slate-950/60 rounded p-2 flex flex-col-reverse">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-3" onClick={onClose}>
+      <div ref={dialog} role="dialog" aria-modal="true" aria-labelledby={titleId}
+        className="result-dialog flex w-full max-w-xl min-w-0 flex-col gap-3 overflow-y-auto rounded-xl border border-slate-600 bg-slate-900 p-3 sm:p-4"
+        onClick={(e) => e.stopPropagation()} onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation()
+            onClose()
+          }
+          if (e.key !== 'Tab') return
+          const targets = dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input, [tabindex="0"]')
+          if (!targets?.length) return
+          const first = targets[0]
+          const last = targets[targets.length - 1]
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault()
+            last.focus()
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault()
+            first.focus()
+          }
+        }}>
+        <div className="flex shrink-0 items-center justify-between gap-2">
+          <h2 id={titleId} className="font-bold">{title}</h2>
+          <button ref={close} className="btn text-sm" onClick={onClose} aria-label={`关闭${title}`}>关闭</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+export function LogDialog({ log, onClose }: { log: GameEvent[]; onClose: () => void }) {
+  return (
+    <PanelDialog title="操作日志" onClose={onClose}>
+      <EventLog log={log} className="h-[min(65dvh,36rem)] min-h-0" />
+    </PanelDialog>
+  )
+}
+
+export function EventLog({ log, className = 'h-64 xl:h-48' }: { log: GameEvent[]; className?: string }) {
+  return (
+    <div
+      className={`${className} min-w-0 overflow-y-auto break-words text-sm xl:text-xs space-y-0.5 font-mono bg-slate-950/60 rounded p-2 flex flex-col-reverse`}
+    >
       <div>
         {log.map((e, i) => (
           <div key={i} className={e.kind === 'noble' ? 'text-amber-300' : ''}>
@@ -59,11 +156,26 @@ export function EventLog({ log }: { log: GameEvent[] }) {
   )
 }
 
-export function Chat({ chat, onSend }: { chat: ChatMessage[]; onSend: (t: string) => void }) {
+export function Chat({
+  chat,
+  onSend,
+  className = 'h-48 xl:h-24',
+  autoFocus,
+}: {
+  chat: ChatMessage[]
+  onSend: (t: string) => void
+  className?: string
+  autoFocus?: boolean
+}) {
   const [text, setText] = useState('')
+  const list = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (list.current) list.current.scrollTop = list.current.scrollHeight
+  }, [chat.length])
   return (
-    <div className="space-y-1">
-      <div className="h-48 xl:h-24 overflow-y-auto break-words text-sm xl:text-xs bg-slate-950/60 rounded p-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-1">
+      <div ref={list} className={`${className} min-h-0 overflow-y-auto break-words text-sm xl:text-xs bg-slate-950/60 rounded p-2`}>
+        {chat.length === 0 && <div className="text-slate-500">还没有消息</div>}
         {chat.map((m, i) => (
           <div key={i}>
             <b className="text-sky-300">{m.from}</b>：{m.text}
@@ -85,9 +197,41 @@ export function Chat({ chat, onSend }: { chat: ChatMessage[]; onSend: (t: string
           onChange={(e) => setText(e.target.value)}
           placeholder="聊天…"
           maxLength={200}
+          autoFocus={autoFocus}
         />
         <button className="btn text-xs">发送</button>
       </form>
+    </div>
+  )
+}
+
+/** Room chat opened from a button: a bottom sheet on phones, a right-hand drawer on larger screens. */
+export function ChatDialog({ chat, onSend, onClose }: { chat: ChatMessage[]; onSend: (t: string) => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 sm:items-stretch sm:justify-end" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="chat-title"
+        className="flex h-[70dvh] w-full min-w-0 flex-col gap-2 rounded-t-xl border border-slate-600 bg-slate-900 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:h-full sm:w-96 sm:rounded-none sm:rounded-l-xl"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            e.stopPropagation()
+            onClose()
+          }
+        }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="chat-title" className="font-bold">
+            房间聊天
+          </h2>
+          <button className="btn text-sm" onClick={onClose} aria-label="关闭聊天">
+            关闭
+          </button>
+        </div>
+        <Chat chat={chat} onSend={onSend} className="flex-1 xl:text-sm" autoFocus />
+      </div>
     </div>
   )
 }

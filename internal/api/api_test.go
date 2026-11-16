@@ -299,6 +299,18 @@ func TestFullGameTwoHumansTwoAIs(t *testing.T) {
 	if rec.Status != "finished" || len(rec.Players) != 4 || rec.Players[1].AILevel != "easy" || len(rec.Frames) == 0 {
 		t.Fatalf("record: %+v", rec.Game)
 	}
+	for _, frame := range rec.Frames {
+		if len(frame.Events) == 0 || frame.Events[0].Kind != "action" || frame.Events[0].Seat != frame.Seat {
+			t.Fatalf("回放缺少结构化行动事件：%+v", frame)
+		}
+		for _, event := range frame.Events {
+			if event.Kind == "action" && (event.Action.Type == engine.ActBuy || event.Action.Type == engine.ActBuyReserved) {
+				if event.Card != event.Action.Card || event.Card < 0 {
+					t.Fatalf("购买事件缺少卡牌信息：%+v", event)
+				}
+			}
+		}
+	}
 	last := rec.Frames[len(rec.Frames)-1].View
 	if last.Phase != engine.PhaseOver {
 		t.Fatalf("replay did not reach the end (%d frames)", len(rec.Frames))
@@ -329,6 +341,24 @@ func TestReconnectKeepsSeat(t *testing.T) {
 	waitRoom(t, ctx, c, func(rs RoomState) bool { return rs.YourSeat == 0 })
 	wsjson.Write(ctx, c, Marshal(game.MsgStart, room.ID, nil))
 	waitRoom(t, ctx, c, func(rs RoomState) bool { return rs.Status == "playing" })
+	// Play one move so there is history to restore.
+	for moved := false; ; {
+		var e Envelope
+		if err := wsjson.Read(ctx, c, &e); err != nil {
+			t.Fatal(err)
+		}
+		if e.Type == game.MsgGameView && !moved {
+			var p GameViewPayload
+			json.Unmarshal(e.Payload, &p)
+			if p.View.Current == p.View.Viewer && len(p.View.Legal) > 0 {
+				wsjson.Write(ctx, c, Marshal(game.MsgAction, room.ID, ActionPayload{Action: pick(p.View.Legal)}))
+				moved = true
+			}
+		}
+		if e.Type == game.MsgEvents && moved {
+			break
+		}
+	}
 	c.Close(websocket.StatusNormalClosure, "")
 
 	c2 := dial(t, ctx, srv, alice.Token)
@@ -337,12 +367,26 @@ func TestReconnectKeepsSeat(t *testing.T) {
 	if rs.YourSeat != 0 || rs.Status != "playing" || rs.Seats[0].Bot {
 		t.Fatalf("reconnect should restore seat: %+v", rs)
 	}
+	gotView := false
 	for {
 		var e Envelope
 		if err := wsjson.Read(ctx, c2, &e); err != nil {
 			t.Fatal(err)
 		}
 		if e.Type == game.MsgGameView {
+			gotView = true
+		}
+		if e.Type == game.MsgEvents {
+			// The first events message after rejoining replays the history so "last move" survives a reload.
+			var p game.EventsPayload
+			json.Unmarshal(e.Payload, &p)
+			mine := false
+			for _, ev := range p.Events {
+				mine = mine || strings.HasPrefix(ev.Text, "alice ")
+			}
+			if !gotView || !p.Replace || !mine {
+				t.Fatalf("expected replayed history after the view, got view=%v %+v", gotView, p)
+			}
 			return
 		}
 	}

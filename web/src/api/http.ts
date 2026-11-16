@@ -1,6 +1,6 @@
 import { appUrl } from '../base'
 import type { AuthUser } from '../store/auth'
-import type { GameRecord, RoomSettings, RoomSummary, Stats, User, View } from './types'
+import type { Card, GameRecord, MoveEvent, Noble, RoomSettings, RoomSummary, Stats, User, View } from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -45,6 +45,7 @@ export interface Frame {
   seat: number
   text: string
   view: View
+  events?: MoveEvent[]
   review?: import('./types').MoveReview
 }
 
@@ -53,7 +54,16 @@ export interface Replay extends GameRecord {
   frames: Frame[]
 }
 
+let catalog: Promise<{ cards: Card[]; nobles: Noble[] }> | null = null
+
 export const api = {
+  cards: () => {
+    catalog ??= request<{ cards: Card[]; nobles: Noble[] }>('GET', '/api/cards').catch((e) => {
+      catalog = null
+      throw e
+    })
+    return catalog
+  },
   register: (username: string, password: string) => request<AuthResponse>('POST', '/api/auth/register', { username, password }),
   login: (username: string, password: string) => request<AuthResponse>('POST', '/api/auth/login', { username, password }),
   me: () => request<User>('GET', '/api/me'),

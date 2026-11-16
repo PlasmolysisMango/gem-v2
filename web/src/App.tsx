@@ -36,8 +36,8 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 sm:px-4 py-2 bg-slate-950/80 border-b border-slate-800">
-        <Link to="/" className="flex min-h-[44px] w-full sm:w-auto items-center text-xl font-black tracking-wide text-amber-300">
+      <header className="shrink-0 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 px-2 sm:px-4 py-1 sm:py-2 bg-slate-950/80 border-b border-slate-800">
+        <Link to="/" className="flex min-h-[44px] items-center text-lg sm:text-xl font-black tracking-wide text-amber-300">
           💎 璀璨宝石
         </Link>
         {user && (
@@ -48,7 +48,7 @@ export default function App() {
             <Link to={`/users/${user.id}`} className="inline-flex min-h-[44px] min-w-[44px] items-center text-sm hover:text-sky-300">
               战绩
             </Link>
-            <span className="ml-auto min-w-0 max-w-[8rem] truncate text-sm text-slate-400" title={user.username}>
+            <span className="ml-auto min-w-0 max-w-[5rem] sm:max-w-[10rem] truncate text-sm text-slate-400" title={user.username}>
               <span className={`inline-block w-2 h-2 rounded-full mr-1 ${connected ? 'bg-emerald-400' : 'bg-rose-500'}`} />
               {user.username}
             </span>

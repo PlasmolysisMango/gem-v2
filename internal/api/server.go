@@ -166,6 +166,7 @@ type Frame struct {
 	Seat   int            `json:"seat"`
 	Text   string         `json:"text"`
 	View   engine.View    `json:"view"`
+	Events []engine.Event `json:"events,omitempty"`
 	Review *ai.MoveReview `json:"review,omitempty"`
 }
 
@@ -188,10 +189,11 @@ func buildReplay(g store.Game) Replay {
 		if json.Unmarshal([]byte(ra.Action), &a) != nil {
 			break
 		}
-		if _, err := s.Apply(a); err != nil {
+		events, err := s.Apply(a)
+		if err != nil {
 			break
 		}
-		f := Frame{Seq: ra.Seq, Seat: ra.Seat, Text: engine.Describe(a), View: s.ViewFor(-1)}
+		f := Frame{Seq: ra.Seq, Seat: ra.Seat, Text: engine.Describe(a), View: s.ViewFor(-1), Events: events}
 		if ra.Review != nil {
 			var mr ai.MoveReview
 			if json.Unmarshal([]byte(*ra.Review), &mr) == nil {

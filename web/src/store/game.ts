@@ -76,9 +76,12 @@ export const useGame = create<GameState>((set, get) => {
         })
         break
       }
-      case 'events':
-        set((s) => ({ log: [...s.log, ...(e.payload.events as GameEvent[])].slice(-300) }))
+      case 'events': {
+        const events = e.payload.events as GameEvent[]
+        // replace: recent history resent on (re)joining, superseding the local log
+        set((s) => ({ log: (e.payload.replace ? events : [...s.log, ...events]).slice(-300) }))
         break
+      }
       case 'hint':
         set({ hint: e.payload.analysis, hintTurn: e.payload.turn, hintLoading: false })
         break

@@ -3,6 +3,10 @@ export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      screens: {
+        xs: '360px',
+        xl: { raw: '(min-width: 1024px) and (orientation: landscape)' },
+      },
       colors: {
         gem: {
           white: '#f4f1ea',

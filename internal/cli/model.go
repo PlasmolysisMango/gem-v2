@@ -99,6 +99,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.clampCursor()
 	case LogMsg:
+		if msg.Replace {
+			m.logs = nil
+		}
 		m.logs = append(m.logs, msg.Lines...)
 		if len(m.logs) > maxLog {
 			m.logs = m.logs[len(m.logs)-maxLog:]

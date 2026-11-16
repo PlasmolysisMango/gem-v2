@@ -269,7 +269,7 @@ func (o *Online) decode(e game.Envelope) tea.Msg {
 			for _, ev := range p.Events {
 				lines = append(lines, ev.Text)
 			}
-			return LogMsg{Lines: lines}
+			return LogMsg{Lines: lines, Replace: p.Replace}
 		}
 	case game.MsgHint:
 		var p game.HintPayload

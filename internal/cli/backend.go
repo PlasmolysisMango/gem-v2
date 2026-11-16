@@ -29,8 +29,11 @@ type ViewMsg struct {
 	View   engine.View
 }
 
-// LogMsg appends lines to the action log.
-type LogMsg struct{ Lines []string }
+// LogMsg appends lines to the action log, or replaces it with a resent history.
+type LogMsg struct {
+	Lines   []string
+	Replace bool
+}
 
 // HintMsg is the strongest AI's analysis for the player's turn.
 type HintMsg struct {

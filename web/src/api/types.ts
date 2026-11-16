@@ -141,6 +141,9 @@ export interface GameEvent {
   text: string
 }
 
+/** 行动图标只需要引擎事件；回放事件不包含日志序号和文本。 */
+export type MoveEvent = Omit<GameEvent, 'seq' | 'text'>
+
 export interface Reason {
   tag: string
   text: string

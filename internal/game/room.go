@@ -68,6 +68,7 @@ type Room struct {
 	hintBusy  map[int]int // seat -> seq of an in-flight hint analysis
 	reviews   map[int][]ai.MoveReview
 	curve     map[int][]CurvePoint
+	history   []seqEvent // recent unmasked events, replayed to joining clients
 	turnTimer *time.Timer
 	deadline  time.Time
 	idleTimer *time.Timer
@@ -92,6 +93,24 @@ func newRoom(h *Hub, id, name string, ownerID int64, ownerName string, seats []s
 
 // ID returns the room id.
 func (r *Room) ID() string { return r.id }
+
+type seqEvent struct {
+	ev  engine.Event
+	seq int
+}
+
+// maxHistory bounds the event history kept for joining clients.
+const maxHistory = 300
+
+// loggedFor renders events for one viewer, hiding what that viewer must not see.
+func (r *Room) loggedFor(evs []seqEvent, viewer int) []LoggedEvent {
+	out := make([]LoggedEvent, 0, len(evs))
+	for _, e := range evs {
+		me := engine.MaskEvent(e.ev, viewer)
+		out = append(out, LoggedEvent{Event: me, Seq: e.seq, Text: r.eventText(me)})
+	}
+	return out
+}
 
 // Summary returns the latest lobby summary.
 func (r *Room) Summary() RoomSummary { return *r.summary.Load() }
@@ -166,6 +185,7 @@ func (r *Room) join(s *Session) {
 	r.broadcastRoom()
 	if r.status != "waiting" {
 		r.sendView(s, idx)
+		s.Send(envelope(MsgEvents, r.id, EventsPayload{Events: r.loggedFor(r.history, idx), Replace: true}))
 		if hc, ok := r.hintCache[idx]; ok && idx >= 0 && hc.seq == r.seq {
 			s.Send(envelope(MsgHint, r.id, HintPayload{Turn: r.seq, Analysis: hc.an}))
 		}
@@ -432,6 +452,7 @@ func (r *Room) start(s *Session) string {
 	r.game, r.gameID, r.seq, r.status = g, id, 0, "playing"
 	r.hintCache, r.hintBusy = map[int]hintEntry{}, map[int]int{}
 	r.reviews, r.curve = map[int][]ai.MoveReview{}, map[int][]CurvePoint{}
+	r.history = nil
 	r.broadcastRoom()
 	r.broadcastViews()
 	r.scheduleTurn()
@@ -527,13 +548,16 @@ func (r *Room) applyMove(idx int, a engine.Action, human bool) error {
 	if err := r.hub.store.AddAction(r.ctx, r.gameID, seq, idx, string(b)); err != nil {
 		fmt.Println("store action:", err)
 	}
+	batch := make([]seqEvent, len(evs))
+	for i, ev := range evs {
+		batch[i] = seqEvent{ev: ev, seq: seq}
+	}
+	r.history = append(r.history, batch...)
+	if n := len(r.history) - maxHistory; n > 0 {
+		r.history = append(r.history[:0:0], r.history[n:]...)
+	}
 	for c, viewer := range r.clients {
-		out := EventsPayload{}
-		for _, ev := range evs {
-			me := engine.MaskEvent(ev, viewer)
-			out.Events = append(out.Events, LoggedEvent{Event: me, Seq: seq, Text: r.eventText(me)})
-		}
-		c.Send(envelope(MsgEvents, r.id, out))
+		c.Send(envelope(MsgEvents, r.id, EventsPayload{Events: r.loggedFor(batch, viewer)}))
 	}
 	if human && r.hints && pre.Phase == engine.PhaseMain {
 		r.review(idx, pre, a, seq)

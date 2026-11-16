@@ -130,9 +130,11 @@ type LoggedEvent struct {
 	Text string `json:"text"`
 }
 
-// EventsPayload carries events produced by one move.
+// EventsPayload carries events produced by one move. Replace marks the recent history sent on
+// (re)joining a game, which supersedes whatever log the client already holds.
 type EventsPayload struct {
-	Events []LoggedEvent `json:"events"`
+	Events  []LoggedEvent `json:"events"`
+	Replace bool          `json:"replace,omitempty"`
 }
 
 // GameOverPayload ends a game.

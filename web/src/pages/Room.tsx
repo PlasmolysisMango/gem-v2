@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { RoomState, SeatInfo } from '../api/types'
+import type { ChatMessage, RoomState, SeatInfo } from '../api/types'
 import { GameBoard, seatLabel } from '../components/GameBoard'
 import { HintPanel } from '../components/HintPanel'
-import { Chat, EventLog, GameOverModal, PlayerPanel, ReviewSummary } from '../components/Panels'
+import { ChatDialog, GameOverModal, LogDialog, PlayerPanel, ReviewSummary } from '../components/Panels'
+import { LANDSCAPE_QUERY, lastMoveEvents, lastMoves } from '../lib/gems'
 import { useAuth } from '../store/auth'
 import { useGame } from '../store/game'
 import { LEVEL_NAME } from './Lobby'
@@ -15,13 +16,18 @@ export default function Room() {
   const user = useAuth((s) => s.user)
   const [focus, setFocus] = useState(0)
   const [showOver, setShowOver] = useState(true)
-  const [mobilePanel, setMobilePanel] = useState<'board' | 'players' | 'hint' | 'log' | 'chat'>('board')
+  const [logOpen, setLogOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatSeen, setChatSeen] = useState<ChatMessage | null>(null)
 
-  useEffect(() => setMobilePanel('board'), [id])
   useEffect(() => {
-    const v = g.view
-    if (v && v.current === v.viewer && (v.phase === 'discard' || v.phase === 'noble')) setMobilePanel('board')
-  }, [g.view?.phase, g.view?.current, g.view?.viewer])
+    setLogOpen(false)
+    setChatOpen(false)
+    setChatSeen(null)
+  }, [id])
+  useEffect(() => {
+    if (chatOpen) setChatSeen(g.chat[g.chat.length - 1] ?? null)
+  }, [chatOpen, g.chat])
 
   useEffect(() => {
     g.joinRoom(id.toUpperCase())
@@ -82,64 +88,72 @@ export default function Room() {
   const hintAction = g.hint?.candidates[focus]?.action
   const order =
     view.viewer >= 0 ? [...Array(view.nPlayers).keys()].map((i) => (i + view.viewer) % view.nPlayers) : [...Array(view.nPlayers).keys()]
+  const opponents = order.filter((s) => s !== view.viewer)
+  const moves = lastMoves(g.log, (s) => seatLabel(room, s))
+  const moveEvents = lastMoveEvents(g.log)
+  const leaveText = view.phase === 'over' || view.viewer < 0 ? '离开' : '认输离开（AI 托管）'
+  // chat keeps the last 100 messages, so count what arrived after the last one seen
+  const unread = g.chat.length - 1 - (chatSeen ? g.chat.lastIndexOf(chatSeen) : -1)
 
+  // 宽横屏三列：对手、棋盘、AI 提示；聊天和日志从顶栏按钮打开。
+  // 竖屏自然滚动：棋盘、银行、双方玩家信息、AI 提示。
   return (
-    <div className="max-w-[1500px] mx-auto min-w-0 space-y-3">
+    <div className="mx-auto min-w-0 max-w-[2400px] flex flex-col gap-2 sm:gap-3 xl:h-full">
       {toast}
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="w-full sm:w-auto min-w-0 break-words font-bold text-lg">{room.name}</span>
-        <span className="font-mono text-slate-400">#{room.id}</span>
-        <span>第 {view.round} 轮</span>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm shrink-0">
+        <span className="min-w-0 max-w-[45%] sm:max-w-none truncate font-bold sm:text-lg" title={room.name}>
+          {room.name}
+        </span>
+        <span className="hidden sm:inline font-mono text-sm text-slate-400">#{room.id}</span>
+        <span className="whitespace-nowrap">第{view.round}轮</span>
         {view.lastRound && <span className="text-amber-300 font-semibold">最后一轮！</span>}
         <TurnBanner room={room} current={view.current} myTurn={myTurn} phase={view.phase} />
         {room.deadline ? <Countdown deadline={room.deadline} /> : null}
-        <button className="btn ml-auto text-xs" onClick={leave}>
-          {view.phase === 'over' || view.viewer < 0 ? '离开' : '认输离开（AI 托管）'}
+        {g.gameOver && !showOver && (
+          <button className="btn-primary text-xs" onClick={() => setShowOver(true)}>
+            查看对局结果
+          </button>
+        )}
+        <button
+          className="btn relative ml-auto text-xs !px-2 sm:!px-3"
+          onClick={() => { setLogOpen(false); setChatOpen(true) }}
+          aria-label={unread > 0 ? `房间聊天（${unread} 条未读）` : '房间聊天'}
+          aria-haspopup="dialog"
+        >
+          聊天
+          {unread > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-[1.1rem] text-white">
+              {unread > 99 ? '99+' : unread}
+            </span>
+          )}
+        </button>
+        <button className="btn text-xs !px-2 sm:!px-3" onClick={() => { setChatOpen(false); setLogOpen(true) }}
+          aria-label="操作日志" aria-haspopup="dialog">
+          日志
+        </button>
+        <button className="btn text-xs !px-2 sm:!px-3" onClick={leave} aria-label={leaveText}>
+          <span className="sm:hidden">{view.phase === 'over' || view.viewer < 0 ? '离开' : '认输离开'}</span>
+          <span className="hidden sm:inline">{leaveText}</span>
         </button>
       </div>
-      <nav aria-label="对局分区" className={`grid ${view.viewer >= 0 ? 'grid-cols-5' : 'grid-cols-4'} gap-1 xl:hidden`}>
-        {(
-          [
-            ['board', '棋盘'],
-            ['players', '玩家'],
-            ['hint', '提示'],
-            ['log', '日志'],
-            ['chat', '聊天'],
-          ] as const
-        )
-          .filter(([key]) => key !== 'hint' || view.viewer >= 0)
-          .map(([key, label]) => (
-            <button
-              key={key}
-              className={`${mobilePanel === key ? 'btn-primary' : 'btn'} px-1 text-sm`}
-              aria-pressed={mobilePanel === key}
-              aria-controls={`room-${key}`}
-              onClick={() => setMobilePanel(key)}
-            >
-              {label}
-            </button>
+      <div className={`min-w-0 flex flex-col gap-2 sm:gap-3 xl:flex-1 xl:min-h-0 xl:grid xl:gap-3 ${view.viewer >= 0
+        ? 'xl:grid-cols-[clamp(13rem,16vw,21rem)_minmax(0,1fr)_clamp(13rem,20vw,26rem)]'
+        : 'xl:grid-cols-[clamp(13rem,16vw,21rem)_minmax(0,1fr)]'}`}>
+        <section
+          aria-label={view.viewer >= 0 ? '对手信息' : '玩家信息'}
+          className="hidden xl:flex xl:flex-col xl:gap-2 xl:min-h-0 xl:overflow-y-auto xl:pr-1"
+        >
+          {opponents.map((s) => (
+            <PlayerPanel key={s} view={view} room={room} seat={s} lastMove={moves.get(s)} moveEvents={moveEvents.get(s)} />
           ))}
-      </nav>
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_420px] gap-4">
-        <section id="room-board" className={`min-w-0 space-y-3 ${mobilePanel === 'board' ? '' : 'hidden xl:block'}`}>
-          <GameBoard view={view} room={room} onAct={view.viewer >= 0 && !mySeat?.bot ? g.act : undefined} hintAction={hintAction} />
-          {g.gameOver && !showOver && (
-            <button className="btn-primary" onClick={() => setShowOver(true)}>
-              查看对局结果
-            </button>
-          )}
         </section>
-        <aside className={`min-w-0 space-y-3 ${mobilePanel === 'board' ? 'hidden xl:block' : ''}`}>
-          <div
-            id="room-players"
-            className={`grid grid-cols-1 min-[400px]:grid-cols-2 gap-2 ${mobilePanel === 'players' ? '' : 'hidden xl:grid'}`}
-          >
-            {order.map((s) => (
-              <PlayerPanel key={s} view={view} room={room} seat={s} />
-            ))}
-          </div>
-          {view.viewer >= 0 && (
-            <div id="room-hint" className={`card ${mobilePanel === 'hint' ? '' : 'hidden xl:block'}`}>
+        <section id="room-board" aria-label="棋盘" className="min-w-0 scroll-mt-2 xl:min-h-0">
+          <GameBoard view={view} room={room} onAct={view.viewer >= 0 && !mySeat?.bot ? g.act : undefined} hintAction={hintAction}
+            moves={moves} moveHistory={moveEvents} />
+        </section>
+        {view.viewer >= 0 && (
+          <aside aria-label="AI提示" className="min-w-0 flex flex-col gap-2 xl:min-h-0 xl:gap-3">
+            <div id="room-hint" className="card xl:flex-1 xl:min-h-0 xl:overflow-y-auto">
               <HintPanel
                 enabled={room.hints}
                 myTurn={myTurn && view.phase === 'main' && !mySeat?.bot}
@@ -148,7 +162,8 @@ export default function Room() {
                 onRequest={g.requestHint}
                 onFocus={(i) => {
                   setFocus(i)
-                  setMobilePanel('board')
+                  if (!window.matchMedia(LANDSCAPE_QUERY).matches)
+                    document.getElementById('room-board')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                 }}
                 focus={focus}
                 lastReview={g.lastReview}
@@ -160,17 +175,11 @@ export default function Room() {
                 </div>
               )}
             </div>
-          )}
-          <div id="room-log" className={mobilePanel === 'log' ? '' : 'hidden xl:block'}>
-            <h3 className="text-sm text-slate-400 mb-2">操作日志</h3>
-            <EventLog log={g.log} />
-          </div>
-          <div id="room-chat" className={mobilePanel === 'chat' ? '' : 'hidden xl:block'}>
-            <h3 className="text-sm text-slate-400 mb-2">房间聊天</h3>
-            <Chat chat={g.chat} onSend={g.sendChat} />
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
+      {chatOpen && <ChatDialog chat={g.chat} onSend={g.sendChat} onClose={() => setChatOpen(false)} />}
+      {logOpen && <LogDialog log={g.log} onClose={() => setLogOpen(false)} />}
       {g.gameOver && showOver && (
         <GameOverModal
           over={g.gameOver}

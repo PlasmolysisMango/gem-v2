@@ -227,6 +227,80 @@ func TestBuyWithGoldAndNoble(t *testing.T) {
 	}
 }
 
+// payable enumerates every split of colored tokens and gold, independent of Affordable.
+func payable(p *PlayerState, c *Card) bool {
+	var rec func(col int, gold int) bool
+	rec = func(col int, gold int) bool {
+		if col == NumGemColors {
+			return true
+		}
+		req := int(c.Cost[col]) - int(p.Bonuses[col])
+		if req < 0 {
+			req = 0
+		}
+		for use := 0; use <= req && use <= int(p.Tokens[col]); use++ {
+			if g := gold - (req - use); g >= 0 && rec(col+1, g) {
+				return true
+			}
+		}
+		return false
+	}
+	return rec(0, int(p.Tokens[Gold]))
+}
+
+func TestAffordableMatchesBruteForce(t *testing.T) {
+	rng := rand.New(rand.NewPCG(3, 4))
+	for i := 0; i < 200000; i++ {
+		var p PlayerState
+		for col := 0; col < NumColors; col++ {
+			p.Tokens[col] = int8(rng.IntN(5))
+		}
+		for col := 0; col < NumGemColors; col++ {
+			p.Bonuses[col] = int8(rng.IntN(6))
+		}
+		c := &Cards[rng.IntN(NumCards)]
+		pay, ok := p.Affordable(c)
+		if ok != payable(&p, c) {
+			t.Fatalf("affordable=%v brute=%v tokens=%v bonuses=%v cost=%v", ok, !ok, p.Tokens, p.Bonuses, c.Cost)
+		}
+		if ok && !p.validPayment(c, pay) {
+			t.Fatalf("default payment %v rejected for cost %v", pay, c.Cost)
+		}
+	}
+}
+
+func TestExplicitPayment(t *testing.T) {
+	s, _ := NewGame(2, 5)
+	id := s.Board[0][0]
+	c := Cards[id]
+	p := &s.Players[0]
+	p.Tokens = Gems{}
+	for col := 0; col < NumGemColors; col++ {
+		p.Tokens[col] = c.Cost[col]
+	}
+	p.Tokens[Gold] = 1
+	s.Bank[Gold]--
+	col := 0
+	for c.Cost[col] == 0 {
+		col++
+	}
+	// Paying an extra gold on top of the full colored cost is rejected.
+	over := p.Tokens
+	over[Gold] = 1
+	if err := s.Validate(Action{Type: ActBuy, Card: id, Gems: over, HasPay: true}); err == nil {
+		t.Fatal("overpayment accepted")
+	}
+	// Gold may replace a colored token the player still holds.
+	pay := p.Tokens
+	pay[col]--
+	if _, err := s.Apply(Action{Type: ActBuy, Card: id, Gems: pay, HasPay: true}); err != nil {
+		t.Fatal(err)
+	}
+	if s.Players[0].Tokens[col] != 1 || s.Players[0].Tokens[Gold] != 0 {
+		t.Fatalf("explicit payment not applied: %v", s.Players[0].Tokens)
+	}
+}
+
 func TestEndGameTiebreak(t *testing.T) {
 	s, _ := NewGame(2, 9)
 	s.Players[0].Points = 15
