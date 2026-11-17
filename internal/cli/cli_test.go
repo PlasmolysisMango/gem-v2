@@ -8,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"gem/internal/ai"
 	"gem/internal/api"
@@ -281,5 +282,55 @@ func TestOnlineGame(t *testing.T) {
 	be.Close()
 	if len(over.Points) != 2 || over.GameID == 0 {
 		t.Fatalf("bad result %+v", over)
+	}
+}
+
+// TestViewFitsTerminal guards the multi-column layout: a long hint must not push
+// the view past the terminal height, or Bubble Tea drops the top rows (nobles).
+func TestViewFitsTerminal(t *testing.T) {
+	g, err := engine.NewGame(4, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := NewModel(&fakeBackend{})
+	m.Update(RoomMsg{State: game.RoomState{ID: "T", Name: "终端练习", Status: "playing", Hints: true, YourSeat: 0,
+		Seats: []game.SeatInfo{
+			{Index: 0, Kind: game.SeatHuman, Name: "me"},
+			{Index: 1, Kind: game.SeatAI, Name: "bot1", Level: "hard"},
+			{Index: 2, Kind: game.SeatAI, Name: "bot2", Level: "hard"},
+			{Index: 3, Kind: game.SeatAI, Name: "bot3", Level: "hard"},
+		}}})
+	v := g.ViewFor(0)
+	m.Update(ViewMsg{View: v})
+	for i := 0; i < 6; i++ {
+		m.Update(LogMsg{Lines: []string{"某玩家拿取 蓝绿红"}})
+	}
+	press(m, runes("h"))
+	m.Update(HintMsg{Analysis: &ai.Analysis{StrategyText: "快速上分：优先高等级低费卡", WinRate: 0.6, Iterations: 900,
+		Candidates: []ai.Candidate{
+			{Action: v.Legal[0], Text: "购买 L2 蓝卡「很长的卡牌名称」", WinRate: 0.6,
+				Reasons: []ai.Reason{{Text: "提供 2 点蓝奖励，直接推进贵族条件"}, {Text: "费用比最高"}},
+				PV:      []ai.PVStep{{}, {Seat: 1, Text: "拿取 蓝蓝绿"}, {Seat: 0, Text: "购买 L1 白卡"}}},
+			{Action: v.Legal[0], Text: "拿取 蓝绿红", WinRate: 0.5, Reasons: []ai.Reason{{Text: "囤积三色筹码"}}},
+		}}})
+
+	for _, sz := range [][2]int{{160, 45}, {140, 40}, {120, 40}, {109, 35}, {104, 32}, {100, 30}, {80, 24}} {
+		m.width, m.height = sz[0], sz[1]
+		out := m.View()
+		lines := strings.Split(out, "\n")
+		if len(lines) > sz[1] {
+			t.Fatalf("%dx%d: view has %d lines", sz[0], sz[1], len(lines))
+		}
+		for _, line := range lines {
+			if w := lipgloss.Width(line); w > sz[0] {
+				t.Fatalf("%dx%d: line is %d cells wide", sz[0], sz[1], w)
+			}
+		}
+		if !strings.Contains(out, "贵族") {
+			t.Fatalf("%dx%d: nobles row missing", sz[0], sz[1])
+		}
+		if sz[0] >= 120 && !strings.Contains(out, "最近动作") {
+			t.Fatalf("%dx%d: recent actions missing", sz[0], sz[1])
+		}
 	}
 }

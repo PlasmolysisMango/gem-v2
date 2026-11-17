@@ -226,9 +226,6 @@ func (m *Model) seatName(i int) string {
 		if s.Kind == game.SeatAI {
 			name = aiName(s)
 		}
-		if s.Bot {
-			name += "[托管]"
-		}
 		if s.Kind == game.SeatHuman && !s.Connected {
 			name += "[离线]"
 		}
@@ -321,6 +318,58 @@ func clip(s string, n int) string {
 		return strings.Join(lines[:n], "\n")
 	}
 	return s
+}
+
+func panelHeight(s string) int {
+	if s == "" {
+		return 0
+	}
+	return strings.Count(s, "\n") + 1
+}
+
+// wrapTo word-wraps s at w cells. Existing layout lines (card boxes) already fit.
+func wrapTo(s string, w int) string {
+	if w <= 0 {
+		return s
+	}
+	return lipgloss.NewStyle().Width(w).Render(s)
+}
+
+// boxClip renders text in a section box, keeping the content within maxH total
+// lines (border included). maxH <= 0 means unlimited.
+func boxClip(text string, w, maxH int) string {
+	lineW := w
+	if lineW > 2 {
+		lineW -= 2 // section horizontal padding
+	}
+	ls := strings.Split(wrapTo(text, lineW), "\n")
+	if maxH > 0 {
+		inner := maxH - 2
+		if inner < 1 {
+			inner = 1
+		}
+		if len(ls) > inner {
+			ls = ls[:inner]
+		}
+	}
+	return stSection.Width(w).Render(strings.Join(ls, "\n"))
+}
+
+// hintBox is the hint panel with a total height budget.
+func (m *Model) hintBox(w, maxH int) string {
+	return boxClip(m.renderHint(), w, maxH)
+}
+
+// recentBox keeps the newest log lines and a height budget.
+func (m *Model) recentBox(w, maxH int) string {
+	n := 6
+	if maxH > 0 {
+		n = min(n, maxH-3) // border (2) + heading (1)
+	}
+	if n < 0 {
+		n = 0
+	}
+	return boxClip(stDim.Render("最近动作")+"\n"+m.renderLog(n), w, maxH)
 }
 
 func verdictStyle(v string) lipgloss.Style {
@@ -456,6 +505,13 @@ func (m *Model) renderOver() string {
 	return b.String()
 }
 
+// Board screen layout constants: five card boxes are 13 cells wide each.
+const (
+	boardWidth   = 65
+	minRightW    = 40
+	defaultRight = 56
+)
+
 // View implements tea.Model.
 func (m *Model) View() string {
 	status := ""
@@ -491,22 +547,86 @@ func (m *Model) View() string {
 		left = append(left, np)
 	}
 	left = append(left, status, stDim.Render(m.help()))
+	leftText := lipgloss.JoinVertical(lipgloss.Left, left...)
 
-	right := []string{stSection.Render(m.renderPlayers())}
-	if m.over != nil {
-		right = append(right, stSection.Render(m.renderOver()))
-	} else {
-		right = append(right, stSection.Width(56).Render(m.renderHint()))
+	rightW := defaultRight
+	stacked := false
+	if m.width > 0 {
+		if m.width < boardWidth+minRightW+4 {
+			stacked = true
+		} else {
+			rightW = min(defaultRight, m.width-boardWidth-4)
+		}
 	}
-	if r := m.renderReview(); r != "" {
-		right = append(right, stSection.Width(56).Render(r))
+	if stacked {
+		return m.renderStacked(leftText)
 	}
-	right = append(right, stSection.Width(56).Render(stDim.Render("最近动作")+"\n"+m.renderLog(8)))
-
-	l := clip(lipgloss.JoinVertical(lipgloss.Left, left...), m.height)
-	r := clip(lipgloss.JoinVertical(lipgloss.Left, right...), m.height)
-	if m.width > 0 && m.width < lipgloss.Width(l)+lipgloss.Width(r)+2 {
-		return lipgloss.JoinVertical(lipgloss.Left, l, r)
-	}
+	l := clip(wrapTo(leftText, boardWidth), m.height)
+	r := m.renderRightPanel(rightW, m.height)
 	return lipgloss.JoinHorizontal(lipgloss.Top, l, "  ", r)
+}
+
+// renderRightPanel stacks the players, hint, review and recent actions so the
+// column fits h terminal lines. The hint shrinks first; the action log keeps at
+// least a heading, so the top of the screen never scrolls away.
+func (m *Model) renderRightPanel(w, h int) string {
+	players := stSection.Width(w).Render(m.renderPlayers())
+	parts := []string{players}
+	used := panelHeight(players)
+
+	review := ""
+	if r := m.renderReview(); r != "" {
+		review = stSection.Width(w).Render(r)
+		used += panelHeight(review)
+	}
+
+	recentH, hintH := 0, 0
+	if h > 0 {
+		const minHint = 5 // border + three content lines
+		recentH = 9       // border + heading + six actions
+		if avail := h - used - minHint; avail < recentH {
+			recentH = max(3, avail)
+		}
+		hintH = h - used - recentH
+		if hintH < minHint {
+			recentH = max(3, h-used-minHint)
+			hintH = h - used - recentH
+		}
+		hintH = max(hintH, 3)
+	}
+	if m.over != nil {
+		parts = append(parts, boxClip(m.renderOver(), w, hintH))
+	} else {
+		parts = append(parts, m.hintBox(w, hintH))
+	}
+	if review != "" {
+		parts = append(parts, review)
+	}
+	parts = append(parts, m.recentBox(w, recentH))
+	return clip(lipgloss.JoinVertical(lipgloss.Left, parts...), h)
+}
+
+// renderStacked is the fallback for terminals too narrow for a side-by-side
+// layout: the board stays on top and a compact hint panel follows below, both
+// cut to the screen height so the top row is never scrolled away.
+func (m *Model) renderStacked(leftText string) string {
+	w, h := m.width, m.height
+	left := leftText
+	switch {
+	case w >= boardWidth:
+		left = wrapTo(left, w)
+	case w > 0:
+		left = lipgloss.NewStyle().MaxWidth(w).Render(left)
+	}
+	rw := max(minRightW, w-2)
+	panel := m.hintBox
+	if m.over != nil {
+		panel = func(w, maxH int) string { return boxClip(m.renderOver(), w, maxH) }
+	}
+	if h <= 0 {
+		return lipgloss.JoinVertical(lipgloss.Left, left, panel(rw, 0))
+	}
+	right := panel(rw, min(8, max(3, h/3)))
+	left = clip(left, h-panelHeight(right))
+	return clip(lipgloss.JoinVertical(lipgloss.Left, left, right), h)
 }
