@@ -160,17 +160,20 @@ curl -fsS "http://127.0.0.1:${INTERNAL_PORT}/${asset_rel}" >/dev/null
 
 step "验证公网入口"
 public_host="$(printf '%s' "$PUBLIC_ORIGIN" | sed -E 's#^https?://([^/]+).*#\1#')"
-for _ in $(seq 1 30); do
-  if curl -fsSk --resolve "${public_host}:443:127.0.0.1" \
-    "${PUBLIC_ORIGIN}${BASE_PATH}/api/healthz" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 0.2
-done
-curl -fsSk --resolve "${public_host}:443:127.0.0.1" \
-  "${PUBLIC_ORIGIN}${BASE_PATH}/api/healthz" >/dev/null
-curl -fsSk --resolve "${public_host}:443:127.0.0.1" \
-  "${PUBLIC_ORIGIN}${BASE_PATH}/" | grep -q "${BASE_PATH}/assets/"
+api_code="$(curl -sk -o /dev/null -w '%{http_code}' \
+  --resolve "${public_host}:443:127.0.0.1" \
+  "${PUBLIC_ORIGIN}${BASE_PATH}/api/healthz")"
+if [[ "$api_code" != "401" ]]; then
+  echo "API 鉴权入口异常：期望未登录返回 401，实际 ${api_code}" >&2
+  exit 1
+fi
+page_code="$(curl -sk -o /dev/null -w '%{http_code}' \
+  --resolve "${public_host}:443:127.0.0.1" \
+  "${PUBLIC_ORIGIN}${BASE_PATH}/")"
+if [[ "$page_code" != "302" ]]; then
+  echo "页面鉴权入口异常：期望未登录跳转登录页，实际 ${page_code}" >&2
+  exit 1
+fi
 curl -fsSk --resolve "${public_host}:443:127.0.0.1" \
   "${PUBLIC_ORIGIN}${asset_path}" >/dev/null
 ws_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
