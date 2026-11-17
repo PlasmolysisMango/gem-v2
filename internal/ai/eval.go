@@ -8,7 +8,8 @@ import (
 
 // Evaluator scores positions with a weighted feature model.
 type Evaluator struct {
-	W Weights
+	W             Weights
+	searchTargets bool
 }
 
 // NewEvaluator returns an evaluator with default weights.
@@ -66,9 +67,13 @@ func (e *Evaluator) playerValue(s *engine.GameState, seat int, sc *stateCtx) flo
 			v -= w.ReserveDead * math.Min(float64(t-3), 4)
 		}
 		worth := e.cardWorth(s, p, c, sc)
-		val := worth * math.Pow(w.TargetDecay, float64(t))
-		if reserved {
-			val *= 1.15
+		// One-ply agents need the purchase-turn discount to avoid hoarding affordable targets.
+		val := worth * math.Pow(w.TargetDecay, float64(t+1))
+		if e.searchTargets {
+			val = worth * math.Pow(w.TargetDecay, float64(t))
+			if reserved {
+				val *= 1.15
+			}
 		}
 		if val > t1 {
 			t1, t2 = val, t1

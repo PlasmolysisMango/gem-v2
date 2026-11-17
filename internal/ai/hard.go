@@ -12,12 +12,13 @@ import (
 	"gem/internal/engine"
 )
 
-// HardAgent runs single-observer information-set MCTS (ISMCTS): every iteration samples
+// HardAgent powers the hard and master search levels with single-observer ISMCTS: every iteration samples
 // the hidden cards (deck order, opponents' face-down reserves) consistently with what the
 // player can see, descends a shared tree with PUCT using heuristic priors, finishes with a
 // short heuristic rollout and evaluates the leaf. Near the end of the game a paranoid
 // look-ahead over sampled worlds vetoes moves that lose by force.
 type HardAgent struct {
+	level        Level
 	E            *Evaluator
 	Budget       time.Duration
 	Workers      int
@@ -29,16 +30,19 @@ type HardAgent struct {
 	EndgameAt    int // max score that triggers endgame search
 }
 
-// NewHard creates a hard agent with the given think time.
 func NewHard(budget time.Duration) *HardAgent {
-	w := runtime.NumCPU()
-	if w > 8 {
-		w = 8
-	}
-	return &HardAgent{E: NewEvaluator(), Budget: budget, Workers: w, TopK: 14, RolloutDepth: 2, C: 1.4, PriorTemp: 0.6, EndgameAt: 12}
+	h := NewMaster(budget)
+	h.level, h.Workers = Hard, 1
+	return h
 }
 
-func (h *HardAgent) Level() Level { return Hard }
+func NewMaster(budget time.Duration) *HardAgent {
+	w := min(runtime.NumCPU(), 8)
+	e := &Evaluator{W: DefaultWeights, searchTargets: true}
+	return &HardAgent{level: Master, E: e, Budget: budget, Workers: w, TopK: 14, RolloutDepth: 2, C: 1.4, PriorTemp: 0.6, EndgameAt: 12}
+}
+
+func (h *HardAgent) Level() Level { return h.level }
 
 type node struct {
 	action   engine.Action
@@ -273,7 +277,7 @@ func (h *HardAgent) Choose(ctx context.Context, m *engine.GameState, seat int) (
 // candidates carry human-readable reasons and a strategy label.
 func (h *HardAgent) Analyze(ctx context.Context, m *engine.GameState, seat int, explain bool) *Analysis {
 	start := time.Now()
-	an := &Analysis{Seat: seat, Level: Hard}
+	an := &Analysis{Seat: seat, Level: h.Level()}
 	rng := newRNG()
 	if m.Phase != engine.PhaseMain {
 		s := engine.Determinize(m, rng)

@@ -61,7 +61,7 @@ type Room struct {
 	seq       int // number of applied actions; identifies a decision point
 	agents    []ai.Agent
 	bot       *ai.MediumAgent
-	hard      *ai.HardAgent
+	coach     *ai.HardAgent
 	aiPending int // seq for which an AI move is being computed, -1 if none
 	hintCache map[int]hintEntry
 	hintBusy  map[int]int // seat -> seq of an in-flight hint analysis
@@ -84,7 +84,7 @@ func newRoom(h *Hub, id, name string, ownerID int64, ownerName string, seats []s
 		hintCache: map[int]hintEntry{}, hintBusy: map[int]int{},
 		reviews: map[int][]ai.MoveReview{}, curve: map[int][]CurvePoint{}, createdAt: time.Now(),
 	}
-	r.hard = ai.NewHard(h.cfg.HintBudget)
+	r.coach = ai.NewMaster(h.cfg.HintBudget)
 	r.bot = ai.NewMedium()
 	r.updateSummary()
 	r.resetIdle()
@@ -460,9 +460,12 @@ func (r *Room) start(s *Session) string {
 			players[i].UserID = &uid
 		} else {
 			players[i].AILevel = string(st.level)
-			if st.level == ai.Hard {
+			switch st.level {
+			case ai.Hard:
 				r.agents[i] = ai.NewHard(r.cfg.HardBudget)
-			} else {
+			case ai.Master:
+				r.agents[i] = ai.NewMaster(r.cfg.MasterBudget)
+			default:
 				r.agents[i] = ai.New(st.level)
 			}
 		}
@@ -535,7 +538,7 @@ func (r *Room) scheduleTurn() {
 	delay := r.cfg.AIDelay
 	go func() {
 		start := time.Now()
-		tctx, cancel := context.WithTimeout(ctx, r.cfg.HardBudget*2+time.Second)
+		tctx, cancel := context.WithTimeout(ctx, max(r.cfg.HardBudget, r.cfg.MasterBudget)*2+time.Second)
 		a, _ := agent.Choose(tctx, &m, cur)
 		cancel()
 		if d := delay - time.Since(start); d > 0 {
@@ -694,7 +697,7 @@ func (r *Room) requestHint(s *Session, idx int, reqID string) {
 	seq := r.seq
 	m := r.game.MaskFor(idx)
 	go func() {
-		an := r.hard.Analyze(r.ctx, &m, idx, true)
+		an := r.coach.Analyze(r.ctx, &m, idx, true)
 		if an != nil && r.ctx.Err() == nil {
 			if b, err := json.Marshal(an); err == nil {
 				if err := r.hub.store.SetHint(context.Background(), r.gameID, idx, seq, string(b)); err != nil {
@@ -722,12 +725,12 @@ func (r *Room) review(idx int, pre engine.GameState, a engine.Action, seq int) {
 	turn := int(pre.Turn)
 	go func() {
 		if an == nil {
-			an = r.hard.Analyze(r.ctx, &pre, idx, false)
+			an = r.coach.Analyze(r.ctx, &pre, idx, false)
 		}
 		if r.ctx.Err() != nil || len(an.Candidates) == 0 {
 			return
 		}
-		rv := r.hard.Review(&pre, idx, an, a)
+		rv := r.coach.Review(&pre, idx, an, a)
 		r.post(func() {
 			r.reviews[idx] = append(r.reviews[idx], rv)
 			r.curve[idx] = append(r.curve[idx], CurvePoint{Turn: turn, WinRate: rv.PlayedWinRate, Best: rv.BestWinRate})

@@ -26,7 +26,7 @@ func playOut(t *testing.T, agents []Agent, seed uint64) engine.GameState {
 }
 
 func fastHard() *HardAgent {
-	h := NewHard(time.Second)
+	h := NewMaster(time.Second)
 	h.MaxIter = 60
 	h.Workers = 2
 	return h
@@ -34,11 +34,38 @@ func fastHard() *HardAgent {
 
 func TestAgentsPlayLegalGames(t *testing.T) {
 	for n := 2; n <= 4; n++ {
-		agents := []Agent{NewEasy(), NewMedium(), fastHard(), NewMedium()}[:n]
+		h := NewHard(time.Second)
+		h.MaxIter = 60
+		agents := []Agent{NewEasy(), NewMedium(), h, fastHard()}[:n]
 		s := playOut(t, agents, uint64(n))
 		if s.Winners == 0 {
 			t.Fatal("no winner")
 		}
+	}
+}
+
+func TestLevels(t *testing.T) {
+	for _, tc := range []struct {
+		level Level
+		name  string
+	}{
+		{Easy, "简单"}, {Medium, "中等"}, {Hard, "困难"}, {Master, "大师"},
+	} {
+		got, ok := ParseLevel(string(tc.level))
+		if !ok || got != tc.level || got.Name() != tc.name || New(got).Level() != tc.level {
+			t.Fatalf("level %q: got=%q ok=%v name=%q agent=%q", tc.level, got, ok, got.Name(), New(got).Level())
+		}
+	}
+}
+
+func TestSearchLevelSettings(t *testing.T) {
+	hard := NewHard(300 * time.Millisecond)
+	master := NewMaster(1500 * time.Millisecond)
+	if hard.Level() != Hard || hard.Workers != 1 || !hard.E.searchTargets {
+		t.Fatalf("hard settings: level=%s workers=%d searchTargets=%v", hard.Level(), hard.Workers, hard.E.searchTargets)
+	}
+	if master.Level() != Master || master.Workers < 1 || !master.E.searchTargets {
+		t.Fatalf("master settings: level=%s workers=%d searchTargets=%v", master.Level(), master.Workers, master.E.searchTargets)
 	}
 }
 
@@ -151,7 +178,7 @@ func TestHardBlocksWinningCard(t *testing.T) {
 func TestReview(t *testing.T) {
 	s, target := threatState(t)
 	m := s.MaskFor(0)
-	h := NewHard(500 * time.Millisecond)
+	h := NewMaster(500 * time.Millisecond)
 	an := h.Analyze(context.Background(), &m, 0, false)
 	r := h.Review(&m, 0, an, an.Candidates[0].Action)
 	if r.Verdict != "best" {

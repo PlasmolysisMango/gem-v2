@@ -81,6 +81,13 @@ else
     printf 'GEM_JWT_SECRET=%s\n' "$(openssl rand -hex 32)" >>"$ENV_FILE"
   fi
 fi
+if ! grep -q '^ENTRY_AUTH_MODE=' "$ENV_FILE"; then
+  {
+    echo "ENTRY_AUTH_MODE=gateway"
+    echo "ENTRY_PUBLIC_ORIGIN=${PUBLIC_ORIGIN:-https://47.99.132.211}"
+    echo "ENTRY_PROXY_KEY_FILE=/etc/entry/proxy.key"
+  } >>"$ENV_FILE"
+fi
 install -m 0644 "$ROOT/deploy/gem-v2.service" "/etc/systemd/system/${SERVICE_NAME}"
 
 # 旧版 gem（v1）与 /gem/ 子路径、9096 端口冲突，确认新版已构建后再停掉。

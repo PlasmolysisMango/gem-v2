@@ -174,7 +174,7 @@ export default function Replay() {
           <div id="replay-review" className={`min-w-0 xl:max-h-[45%] xl:overflow-y-auto ${panel === 'review' ? '' : 'hidden xl:block'}`}>
             {reviews.length > 0 ? (
               <div className="card space-y-2">
-                <h3 className="font-semibold">走后复盘（困难 AI 评估）</h3>
+                <h3 className="font-semibold">走后复盘（大师 AI 评估）</h3>
                 {[...curveBySeat.entries()].map(([seat, curve]) => (
                   <div key={seat} className="space-y-1">
                     <div className="text-sm">{label(seat)}</div>

@@ -1,7 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { StaticRouter } from 'react-router-dom/server'
+import Lobby from '../pages/Lobby'
 import Room from '../pages/Room'
+import * as authStore from '../store/auth'
 import * as gameStore from '../store/game'
 import type { Action, Analysis, Card, GameOver, MoveEvent, RoomState, View } from '../api/types'
 import { GameBoard } from './GameBoard'
@@ -52,6 +54,53 @@ function fixture(phase: View['phase'] = 'main'): View {
 }
 
 describe('手机端组件结构', () => {
+  it('大厅快速练习和座位下拉提供四档 AI，默认对手为大师', () => {
+    const html = renderToStaticMarkup(<StaticRouter location="/"><Lobby /></StaticRouter>)
+    const select = html.match(/<select\b[^>]*>[\s\S]*?<\/select>/)?.[0] ?? ''
+    const levels = [['easy', '简单'], ['medium', '中等'], ['hard', '困难'], ['master', '大师']] as const
+    expect(select.match(/<option value="(?:easy|medium|hard|master)"/g)).toHaveLength(4)
+    for (const [level, label] of levels) {
+      expect(select).toMatch(new RegExp(`<option value="${level}"(?: selected="")?>AI · ${label}</option>`))
+      expect(html).toMatch(new RegExp(`<button[^>]*>${label}</button>`))
+    }
+    expect(select).toContain('<option value="master" selected="">AI · 大师</option>')
+  })
+
+  it('等待房间每个可配置座位均提供四档 AI，支持大师座位显示和选中', () => {
+    const state = gameStore.useGame.getState()
+    const room: RoomState = {
+      id: 'TEST', name: '测试房间', ownerId: 1, ownerName: '房主', status: 'waiting', hints: true,
+      turnSeconds: 0, yourSeat: 0, spectators: 0,
+      seats: [
+        { index: 0, kind: 'human', userId: 1, name: '房主', connected: true },
+        ...(['easy', 'medium', 'master'] as const).map((level, i) => ({
+          index: i + 1, kind: 'ai' as const, name: '', level, connected: true,
+        })),
+      ],
+    }
+    const gameSpy = vi.spyOn(gameStore, 'useGame')
+    const authSpy = vi.spyOn(authStore, 'useAuth')
+    try {
+      gameSpy.mockReturnValue({ ...state, room, view: null })
+      authSpy.mockReturnValue({ id: 1, username: '房主', isAdmin: false, createdAt: '' })
+      const html = renderToStaticMarkup(<StaticRouter location="/room/TEST"><Room /></StaticRouter>)
+      const selects = html.match(/<select\b[^>]*>[\s\S]*?<\/select>/g) ?? []
+      const levels = [['easy', '简单'], ['medium', '中等'], ['hard', '困难'], ['master', '大师']] as const
+      expect(selects).toHaveLength(3)
+      for (const select of selects) {
+        expect(select.match(/<option value="ai:(?:easy|medium|hard|master)"/g)).toHaveLength(4)
+        for (const [level, label] of levels) {
+          expect(select).toMatch(new RegExp(`<option value="ai:${level}"(?: selected="")?>AI · ${label}</option>`))
+        }
+      }
+      expect(selects[2]).toContain('<option value="ai:master" selected="">AI · 大师</option>')
+      expect(html).toMatch(/<span[^>]*>AI · 大师<\/span>/)
+    } finally {
+      authSpy.mockRestore()
+      gameSpy.mockRestore()
+    }
+  })
+
   it('可点击筹码提供 44px 触控目标，装饰筹码保持紧凑', () => {
     const clickable = renderToStaticMarkup(<GemToken color="blue" count={2} size="sm" onClick={() => {}} />)
     expect(clickable).toContain('w-11 h-11')
@@ -261,7 +310,7 @@ describe('手机端组件结构', () => {
   it('提示候选支持键盘与触控，选择候选不会自动执行动作', () => {
     const hint: Analysis = {
       seat: 0,
-      level: 'hard',
+      level: 'master',
       strategy: 'engine',
       strategyText: '引擎',
       winRate: 0.6,
@@ -277,6 +326,13 @@ describe('手机端组件结构', () => {
     expect(html).toContain('tabindex="0"')
     expect(html).toContain('不会自动落子')
     expect(html).toContain('shrink-0')
+    expect(html).toContain('由大师 AI（ISMCTS）在你的视角下实时演算')
+    expect(html).not.toContain('困难 AI')
+    const loading = renderToStaticMarkup(
+      <HintPanel enabled myTurn loading hint={null} onRequest={() => {}} onFocus={() => {}} focus={0} lastReview={null} />,
+    )
+    expect(loading).toContain('大师 AI 演算中…')
+    expect(loading).not.toContain('困难 AI')
   })
 
   it('聊天以弹层打开：手机底部抽屉、大屏右侧抽屉，带关闭入口', () => {
@@ -296,6 +352,8 @@ describe('手机端组件结构', () => {
     expect(html).toContain('w-full max-w-[560px] min-w-0')
     expect(html).toContain('overflow-y-auto overscroll-contain')
     expect(html).toContain('aria-label="关闭对局结果"')
+    expect(html).toContain('胜率为大师 AI 的估计值')
+    expect(html).not.toContain('困难 AI')
     expect(html).not.toMatch(/(?:^|[\s"])w-\[560px\](?=[\s"])/)
   })
 })

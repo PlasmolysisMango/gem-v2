@@ -18,7 +18,7 @@ import (
 type Offline struct {
 	// Delay is the minimum time an AI move is shown as "thinking".
 	Delay time.Duration
-	// Review grades every main-phase move of the human with the hard AI.
+	// Review grades every main-phase move of the human with the master AI.
 	Review bool
 
 	mu       sync.Mutex
@@ -38,7 +38,7 @@ type Offline struct {
 }
 
 // NewOffline creates a game against the given AI levels (1-3 opponents).
-// budget is the thinking time of hard AIs and of the hint coach.
+// budget is the thinking time of master AIs and of the hint coach.
 func NewOffline(levels []ai.Level, seed uint64, budget time.Duration) (*Offline, error) {
 	if len(levels) < 1 || len(levels) > 3 {
 		return nil, fmt.Errorf("需要 1-3 个 AI 对手")
@@ -48,11 +48,11 @@ func NewOffline(levels []ai.Level, seed uint64, budget time.Duration) (*Offline,
 		return nil, err
 	}
 	o := &Offline{Delay: 500 * time.Millisecond, Review: true, g: g, levels: levels,
-		coach: ai.NewHard(budget), hintTurn: -1, kick: make(chan struct{}, 1)}
+		coach: ai.NewMaster(budget), hintTurn: -1, kick: make(chan struct{}, 1)}
 	o.agents = make([]ai.Agent, len(levels)+1)
 	for i, l := range levels {
-		if l == ai.Hard {
-			o.agents[i+1] = ai.NewHard(budget)
+		if l == ai.Master {
+			o.agents[i+1] = ai.NewMaster(budget)
 		} else {
 			o.agents[i+1] = ai.New(l)
 		}

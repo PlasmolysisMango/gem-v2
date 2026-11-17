@@ -374,7 +374,7 @@ export function GameOverModal({
           </button>
         </div>
         <div className="text-xs text-slate-500">
-          胜率为困难 AI 的估计值：{over.curve.length ? pct(over.curve[over.curve.length - 1].winRate) : '-'}（最后一手）
+          胜率为大师 AI 的估计值：{over.curve.length ? pct(over.curve[over.curve.length - 1].winRate) : '-'}（最后一手）
         </div>
       </div>
     </div>

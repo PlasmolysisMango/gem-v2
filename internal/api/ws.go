@@ -32,11 +32,13 @@ type (
 	ErrorPayload    = game.ErrorPayload
 )
 
-// ws upgrades an authenticated connection (?token=) and routes messages to rooms.
+// ws upgrades an authenticated connection and routes messages to rooms.
+// Browser clients authenticate through the nginx gateway; legacy tokens are
+// only accepted when ENTRY_AUTH_MODE is not gateway.
 func (s *Server) ws(w http.ResponseWriter, r *http.Request) {
-	id, err := s.Auth.Parse(auth.TokenFrom(r))
-	if err != nil {
-		writeErr(w, 401, err.Error())
+	id, ok := auth.From(r.Context())
+	if !ok {
+		writeErr(w, 401, auth.ErrToken.Error())
 		return
 	}
 	// Tokens (not cookies) authenticate the socket, so cross-origin upgrades are harmless.

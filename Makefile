@@ -5,12 +5,13 @@ ADDR    ?= :8080
 DB      ?= gem.db
 SECRET  ?= dev-secret-change-me
 
-# arena defaults: make arena A=hard B=medium GAMES=500 PARALLEL=8 WORKERS=6
-A        ?= hard
+# arena defaults: make arena A=master B=medium GAMES=500 PARALLEL=8 WORKERS=6
+A        ?= master
 B        ?= medium
 PLAYERS  ?= 2
 GAMES    ?= 100
-HARD_MS  ?= 1500
+HARD_MS  ?= 300
+MASTER_MS ?= 1500
 PARALLEL ?= 1
 WORKERS  ?= 0
 
@@ -63,7 +64,7 @@ build-arena:
 
 ## arena: AI self-play evaluation
 arena:
-	$(GO) run ./cmd/gem-arena -a $(A) -b $(B) -players $(PLAYERS) -games $(GAMES) -hard-ms $(HARD_MS) -parallel $(PARALLEL) -workers $(WORKERS)
+	$(GO) run ./cmd/gem-arena -a $(A) -b $(B) -players $(PLAYERS) -games $(GAMES) -hard-ms $(HARD_MS) -master-ms $(MASTER_MS) -parallel $(PARALLEL) -workers $(WORKERS)
 
 docker:
 	docker build -t gem-server .

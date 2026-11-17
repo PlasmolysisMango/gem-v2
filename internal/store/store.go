@@ -3,8 +3,10 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -93,11 +95,12 @@ func (s *Store) migrate(ctx context.Context) error {
 
 // User is a registered account.
 type User struct {
-	ID        int64     `json:"id"`
-	Username  string    `json:"username"`
-	PwHash    string    `json:"-"`
-	IsAdmin   bool      `json:"isAdmin"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID         int64     `json:"id"`
+	Username   string    `json:"username"`
+	ExternalID string    `json:"externalId,omitempty"`
+	PwHash     string    `json:"-"`
+	IsAdmin    bool      `json:"isAdmin"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 func (s *Store) CreateUser(ctx context.Context, username, pwHash string) (User, error) {
@@ -116,7 +119,7 @@ func (s *Store) CreateUser(ctx context.Context, username, pwHash string) (User, 
 func (s *Store) scanUser(row *sql.Row) (User, error) {
 	var u User
 	var ts int64
-	if err := row.Scan(&u.ID, &u.Username, &u.PwHash, &u.IsAdmin, &ts); err != nil {
+	if err := row.Scan(&u.ID, &u.Username, &u.ExternalID, &u.PwHash, &u.IsAdmin, &ts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, ErrNotFound
 		}
@@ -127,11 +130,62 @@ func (s *Store) scanUser(row *sql.Row) (User, error) {
 }
 
 func (s *Store) UserByName(ctx context.Context, username string) (User, error) {
-	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, pw_hash, is_admin, created_at FROM users WHERE username = ?`, username))
+	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, COALESCE(external_id,''), pw_hash, is_admin, created_at FROM users WHERE username = ?`, username))
 }
 
 func (s *Store) UserByID(ctx context.Context, id int64) (User, error) {
-	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, pw_hash, is_admin, created_at FROM users WHERE id = ?`, id))
+	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, COALESCE(external_id,''), pw_hash, is_admin, created_at FROM users WHERE id = ?`, id))
+}
+
+func (s *Store) UserByExternalID(ctx context.Context, externalID string) (User, error) {
+	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, COALESCE(external_id,''), pw_hash, is_admin, created_at FROM users WHERE external_id = ?`, strings.TrimSpace(externalID)))
+}
+
+// EnsureExternalUser maps a portal identity to a local mirror row, creating it
+// on first visit. Legacy rows without external_id are never hijacked.
+func (s *Store) EnsureExternalUser(ctx context.Context, externalID, username string) (User, error) {
+	externalID = strings.TrimSpace(externalID)
+	username = strings.TrimSpace(username)
+	if externalID == "" {
+		return User{}, errors.New("external id required")
+	}
+	if username == "" {
+		username = externalID
+	}
+	if u, err := s.UserByExternalID(ctx, externalID); err == nil {
+		return u, nil
+	} else if !errors.Is(err, ErrNotFound) {
+		return User{}, err
+	}
+	for attempt := 0; attempt < 5; attempt++ {
+		candidate := username
+		if _, err := s.UserByName(ctx, candidate); err == nil {
+			candidate = username + "_" + randomSuffix()
+		} else if !errors.Is(err, ErrNotFound) {
+			return User{}, err
+		}
+		now := time.Now()
+		res, err := s.db.ExecContext(ctx, `INSERT INTO users (username, pw_hash, external_id, created_at) VALUES (?, ?, ?, ?)`,
+			candidate, "!"+randomSuffix(), externalID, now.Unix())
+		if err != nil {
+			if strings.Contains(err.Error(), "UNIQUE") {
+				if u, lookupErr := s.UserByExternalID(ctx, externalID); lookupErr == nil {
+					return u, nil
+				}
+				continue
+			}
+			return User{}, err
+		}
+		id, _ := res.LastInsertId()
+		return User{ID: id, Username: candidate, ExternalID: externalID, PwHash: "!", CreatedAt: time.Unix(now.Unix(), 0)}, nil
+	}
+	return User{}, errors.New("创建本地镜像用户失败")
+}
+
+func randomSuffix() string {
+	buf := make([]byte, 3)
+	rand.Read(buf)
+	return hex.EncodeToString(buf)
 }
 
 // PromoteAdmin grants admin rights to an existing account. It reports whether

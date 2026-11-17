@@ -1,52 +1,38 @@
 import { create } from 'zustand'
-import { setToken } from '../api/http'
+import { api } from '../api/http'
 
 export interface AuthUser {
   id: number
   username: string
+  externalId?: string
   isAdmin?: boolean
+  entry?: { uid: string; username: string; displayName: string; role: string; grants: string }
 }
 
 interface AuthState {
-  token: string | null
   user: AuthUser | null
-  login: (token: string, user: AuthUser) => void
+  ready: boolean
   setUser: (user: AuthUser) => void
+  hydrate: () => Promise<void>
   logout: () => void
 }
 
-const KEY = 'gem.auth'
-
-function load(): { token: string | null; user: AuthUser | null } {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (raw) {
-      const v = JSON.parse(raw)
-      setToken(v.token)
-      return v
+export const useAuth = create<AuthState>((set) => ({
+  user: null,
+  ready: false,
+  setUser: (user) => set({ user }),
+  hydrate: async () => {
+    localStorage.removeItem('gem.auth')
+    try {
+      const user = await api.me()
+      set({ user, ready: true })
+    } catch {
+      set({ user: null, ready: true })
     }
-  } catch {
-    /* ignore */
-  }
-  return { token: null, user: null }
-}
-
-export const useAuth = create<AuthState>((set, get) => ({
-  ...load(),
-  login: (token, user) => {
-    localStorage.setItem(KEY, JSON.stringify({ token, user }))
-    setToken(token)
-    set({ token, user })
-  },
-  setUser: (user) => {
-    const token = get().token
-    if (!token) return
-    localStorage.setItem(KEY, JSON.stringify({ token, user }))
-    set({ user })
   },
   logout: () => {
-    localStorage.removeItem(KEY)
-    setToken(null)
-    set({ token: null, user: null })
+    void fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).finally(() => {
+      location.assign('/login')
+    })
   },
 }))

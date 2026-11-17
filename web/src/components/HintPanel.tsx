@@ -61,9 +61,9 @@ export function HintPanel({
           disabled={!myTurn || loading}
           onClick={onRequest}
         >
-          {loading ? '困难 AI 演算中…' : '提示'}
+          {loading ? '大师 AI 演算中…' : '提示'}
         </button>
-        <span className="text-xs text-slate-400">由困难 AI（ISMCTS）在你的视角下实时演算</span>
+        <span className="text-xs text-slate-400">由大师 AI（ISMCTS）在你的视角下实时演算</span>
       </div>
       {lastReview && (
         <div>

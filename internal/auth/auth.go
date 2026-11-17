@@ -14,6 +14,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
+	"gem/internal/entryauth"
 	"gem/internal/store"
 )
 
@@ -29,6 +30,7 @@ var (
 type Identity struct {
 	UserID   int64  `json:"id"`
 	Username string `json:"username"`
+	Role     string `json:"-"`
 }
 
 // Service issues and verifies credentials.
@@ -37,6 +39,7 @@ type Service struct {
 	Secret []byte
 	TTL    time.Duration
 	Cost   int // bcrypt cost
+	Entry  *entryauth.Gateway
 }
 
 func New(st *store.Store, secret []byte) *Service {
@@ -150,16 +153,43 @@ func TokenFrom(r *http.Request) string {
 	return r.URL.Query().Get("token")
 }
 
-// Middleware rejects requests without a valid token.
+// Middleware rejects requests without a valid token, or validates the
+// identity injected by the nginx gateway when gateway mode is enabled.
 func (s *Service) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.Entry != nil {
+			gw, err := s.Entry.Identity(r)
+			if err != nil {
+				writeUnauthorized(w, err)
+				return
+			}
+			u, err := s.Store.EnsureExternalUser(r.Context(), gw.UID, gw.Username)
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte(`{"error":"初始化本地用户失败"}`))
+				return
+			}
+			id := Identity{UserID: u.ID, Username: u.Username, Role: gw.Role}
+			next.ServeHTTP(w, r.WithContext(WithIdentity(r.Context(), id)))
+			return
+		}
 		id, err := s.Parse(TokenFrom(r))
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error":"` + err.Error() + `"}`))
+			writeUnauthorized(w, err)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(WithIdentity(r.Context(), id)))
 	})
+}
+
+func writeUnauthorized(w http.ResponseWriter, err error) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusUnauthorized)
+	w.Write([]byte(`{"error":"` + err.Error() + `"}`))
+}
+
+// IsAdmin reports whether the identity carries the global admin role.
+func (id Identity) IsAdmin() bool {
+	return id.Role == "admin" || id.Role == "superadmin"
 }

@@ -16,12 +16,13 @@ const (
 	Easy   Level = "easy"
 	Medium Level = "medium"
 	Hard   Level = "hard"
+	Master Level = "master"
 )
 
 // ParseLevel validates a level string.
 func ParseLevel(s string) (Level, bool) {
 	switch Level(s) {
-	case Easy, Medium, Hard:
+	case Easy, Medium, Hard, Master:
 		return Level(s), true
 	}
 	return "", false
@@ -36,6 +37,8 @@ func (l Level) Name() string {
 		return "中等"
 	case Hard:
 		return "困难"
+	case Master:
+		return "大师"
 	}
 	return string(l)
 }
@@ -89,8 +92,10 @@ func New(l Level) Agent {
 		return NewEasy()
 	case Medium:
 		return NewMedium()
+	case Hard:
+		return NewHard(300 * time.Millisecond)
 	default:
-		return NewHard(1500 * time.Millisecond)
+		return NewMaster(1500 * time.Millisecond)
 	}
 }
 
@@ -98,7 +103,7 @@ func newRNG() *rand.Rand {
 	return rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64()))
 }
 
-// EasyAgent: one-ply greedy on its own strength with heavy randomness; ignores opponents.
+// EasyAgent: one-ply greedy on its own strength with moderate randomness; ignores opponents.
 type EasyAgent struct {
 	E       *Evaluator
 	Epsilon float64
@@ -107,7 +112,7 @@ type EasyAgent struct {
 }
 
 func NewEasy() *EasyAgent {
-	return &EasyAgent{E: NewEvaluator(), Epsilon: 0.2, Temp: 0.6, rng: newRNG()}
+	return &EasyAgent{E: NewEvaluator(), Epsilon: 0.1, Temp: 0.6, rng: newRNG()}
 }
 
 func (a *EasyAgent) Level() Level { return Easy }

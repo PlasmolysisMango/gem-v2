@@ -119,7 +119,7 @@ func parseLevels(s string) ([]string, error) {
 			continue
 		}
 		if _, ok := ai.ParseLevel(p); !ok {
-			return nil, fmt.Errorf("未知 AI 难度 %q（easy/medium/hard）", p)
+			return nil, fmt.Errorf("未知 AI 难度 %q（easy/medium/hard/master）", p)
 		}
 		out = append(out, p)
 	}
@@ -184,9 +184,9 @@ func joinRoom(c *cli.Client, id string) error {
 func cmdPlay(args []string) error {
 	fs := flag.NewFlagSet("play", flag.ExitOnError)
 	offline := fs.Bool("offline", false, "本地离线对战，无需服务器")
-	ais := fs.String("ai", "hard", "对手难度，逗号分隔（1-3 个）")
+	ais := fs.String("ai", "master", "对手难度 easy/medium/hard/master，逗号分隔（1-3 个）")
 	seed := fs.Uint64("seed", 0, "离线对局随机种子（0 为随机）")
-	budget := fs.Duration("budget", 1500*time.Millisecond, "离线困难 AI / 提示的思考时间")
+	budget := fs.Duration("budget", 1500*time.Millisecond, "离线大师 AI / 提示的思考时间（困难固定 300ms）")
 	review := fs.Bool("review", true, "离线：每步走后复盘")
 	fs.Parse(args)
 	levels, err := parseLevels(*ais)

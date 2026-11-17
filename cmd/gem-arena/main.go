@@ -14,15 +14,16 @@ import (
 )
 
 func main() {
-	a := flag.String("a", "hard", "agent A level (easy|medium|hard)")
-	b := flag.String("b", "medium", "agent B level (easy|medium|hard)")
+	a := flag.String("a", "master", "agent A level (easy|medium|hard|master)")
+	b := flag.String("b", "medium", "agent B level (easy|medium|hard|master)")
 	players := flag.Int("players", 2, "players per game (2-4); A takes one seat, B the rest")
 	games := flag.Int("games", 100, "number of games")
-	hardMs := flag.Int("hard-ms", 1500, "hard AI think time per move in ms")
+	hardMs := flag.Int("hard-ms", 300, "hard AI think time per move in ms")
+	masterMs := flag.Int("master-ms", 1500, "master AI think time per move in ms")
 	seed := flag.Uint64("seed", 1, "base seed")
 	tune := flag.Int("tune", 0, "run N rounds of hill-climbing on medium weights instead of a match")
 	parallel := flag.Int("parallel", 1, "games to run concurrently")
-	workers := flag.Int("workers", 0, "hard AI search goroutines per move (0 = NumCPU)")
+	workers := flag.Int("workers", 0, "master AI search goroutines per move (0 = NumCPU)")
 	flag.Parse()
 
 	if *tune > 0 {
@@ -37,7 +38,10 @@ func main() {
 		}
 		return func() ai.Agent {
 			if lv == ai.Hard {
-				h := ai.NewHard(time.Duration(*hardMs) * time.Millisecond)
+				return ai.NewHard(time.Duration(*hardMs) * time.Millisecond)
+			}
+			if lv == ai.Master {
+				h := ai.NewMaster(time.Duration(*masterMs) * time.Millisecond)
 				if *workers > 0 {
 					h.Workers = *workers
 				}

@@ -29,7 +29,7 @@ interface GameState {
   gameOver: GameOver | null
   chat: ChatMessage[]
   error: string | null
-  connect: (token: string) => void
+  connect: () => void
   disconnect: () => void
   joinRoom: (id: string) => void
   leaveRoom: () => void
@@ -105,9 +105,9 @@ export const useGame = create<GameState>((set, get) => {
     connected: false,
     roomId: null,
     ...fresh,
-    connect: (token) => {
+    connect: () => {
       if (get().socket) return
-      const s = new Socket(token)
+      const s = new Socket()
       s.onMessage = handle
       s.onStatus = (connected) => set({ connected })
       s.onOpen = () => {

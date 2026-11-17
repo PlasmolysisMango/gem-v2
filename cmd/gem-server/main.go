@@ -17,6 +17,7 @@ import (
 
 	"gem/internal/api"
 	"gem/internal/auth"
+	"gem/internal/entryauth"
 	"gem/internal/game"
 	"gem/internal/store"
 	"gem/web"
@@ -29,8 +30,9 @@ func main() {
 	static := flag.String("static", os.Getenv("GEM_STATIC"), "serve the web client from this directory instead of the embedded build")
 	adminUser := flag.String("admin-user", envOr("GEM_ADMIN_USER", "mango"), "promote this existing account to admin at startup (empty disables)")
 	idleClose := flag.Duration("idle-close", envDuration("GEM_IDLE_CLOSE", 168*time.Hour), "close rooms with no clients after this long (0 disables)")
-	hardMs := flag.Int("hard-ms", 1500, "hard AI thinking time per move (ms)")
-	hintMs := flag.Int("hint-ms", 1500, "analysis time for hints (ms)")
+	hardMs := flag.Int("hard-ms", 300, "hard AI thinking time per move (ms)")
+	masterMs := flag.Int("master-ms", 1500, "master AI thinking time per move (ms)")
+	hintMs := flag.Int("hint-ms", 1500, "master AI analysis time for hints (ms)")
 	aiDelay := flag.Int("ai-delay-ms", 600, "minimum display delay of AI moves (ms)")
 	flag.Parse()
 
@@ -80,6 +82,7 @@ func main() {
 	}
 	cfg := game.DefaultConfig()
 	cfg.HardBudget = time.Duration(*hardMs) * time.Millisecond
+	cfg.MasterBudget = time.Duration(*masterMs) * time.Millisecond
 	cfg.HintBudget = time.Duration(*hintMs) * time.Millisecond
 	cfg.AIDelay = time.Duration(*aiDelay) * time.Millisecond
 	cfg.IdleClose = idle
@@ -97,7 +100,16 @@ func main() {
 	if *static != "" {
 		files = os.DirFS(*static)
 	}
-	srv := &api.Server{Auth: auth.New(st, key), Store: st, Hub: hub, Static: files}
+	authSvc := auth.New(st, key)
+	gateway, err := entryauth.New("gem")
+	if err != nil {
+		log.Fatalf("init entry gateway: %v", err)
+	}
+	authSvc.Entry = gateway
+	if gateway != nil {
+		log.Printf("entry gateway auth enabled")
+	}
+	srv := &api.Server{Auth: authSvc, Store: st, Hub: hub, Static: files}
 	hs := &http.Server{Addr: *addr, Handler: srv.Handler(), ReadHeaderTimeout: 10 * time.Second}
 
 	go func() {

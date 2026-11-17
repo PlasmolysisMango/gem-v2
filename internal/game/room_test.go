@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"gem/internal/ai"
 	"gem/internal/engine"
 	"gem/internal/store"
 )
@@ -24,6 +25,7 @@ func testHub(t *testing.T, turnSeconds int) (*Hub, *store.Store) {
 	cfg := DefaultConfig()
 	cfg.AIDelay = 10 * time.Millisecond
 	cfg.HardBudget = 40 * time.Millisecond
+	cfg.MasterBudget = 40 * time.Millisecond
 	cfg.HintBudget = 60 * time.Millisecond
 	cfg.IdleClose = time.Hour
 	h := NewHub(st, cfg)
@@ -200,7 +202,7 @@ func TestRestoreRoomReplaysGame(t *testing.T) {
 	hint := decode[HintPayload](t, waitEnv(t, owner, 5*time.Second, func(e Envelope) bool {
 		return e.Type == MsgHint
 	}))
-	if hint.Analysis == nil || len(hint.Analysis.Candidates) == 0 || hint.Turn == 0 {
+	if hint.Analysis == nil || hint.Analysis.Level != ai.Master || len(hint.Analysis.Candidates) == 0 || hint.Turn == 0 {
 		t.Fatalf("bad hint: %+v", hint)
 	}
 	room.Leave(owner, false)
@@ -247,7 +249,7 @@ func TestRestoreRoomReplaysGame(t *testing.T) {
 	cached := decode[HintPayload](t, waitEnv(t, owner2, 2*time.Second, func(e Envelope) bool {
 		return e.Type == MsgHint
 	}))
-	if cached.Turn != hint.Turn || cached.Analysis == nil || len(cached.Analysis.Candidates) == 0 {
+	if cached.Turn != hint.Turn || cached.Analysis == nil || cached.Analysis.Level != ai.Master || len(cached.Analysis.Candidates) == 0 {
 		t.Fatalf("cached hint was not restored: got %+v want turn %d", cached, hint.Turn)
 	}
 }

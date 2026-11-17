@@ -17,19 +17,21 @@ import (
 
 // Config tunes room behaviour.
 type Config struct {
-	AIDelay    time.Duration // minimum time an AI move takes, for display
-	HardBudget time.Duration // hard AI thinking time per move
-	HintBudget time.Duration // analysis time for hints and move reviews
-	IdleClose  time.Duration // close rooms with no connected clients after this long (0 = never)
+	AIDelay      time.Duration // minimum time an AI move takes, for display
+	HardBudget   time.Duration // hard AI thinking time per move
+	MasterBudget time.Duration // master AI thinking time per move
+	HintBudget   time.Duration // analysis time for hints and move reviews
+	IdleClose    time.Duration // close rooms with no connected clients after this long (0 = never)
 }
 
-// DefaultConfig follows the plan: 600ms AI display delay, 1.5s hard budget, 7-day idle cleanup.
+// DefaultConfig sets AI budgets, display delay and idle cleanup.
 func DefaultConfig() Config {
 	return Config{
-		AIDelay:    600 * time.Millisecond,
-		HardBudget: 1500 * time.Millisecond,
-		HintBudget: 1500 * time.Millisecond,
-		IdleClose:  168 * time.Hour,
+		AIDelay:      600 * time.Millisecond,
+		HardBudget:   300 * time.Millisecond,
+		MasterBudget: 1500 * time.Millisecond,
+		HintBudget:   1500 * time.Millisecond,
+		IdleClose:    168 * time.Hour,
 	}
 }
 

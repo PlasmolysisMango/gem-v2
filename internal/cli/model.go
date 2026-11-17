@@ -46,13 +46,14 @@ type Model struct {
 
 	row, col int
 	sel      engine.Gems // tokens chosen to take or to discard
+	resSeat  int         // seat whose reserved cards the side panel shows
 	showLog  bool
 	width    int
 	height   int
 }
 
 // NewModel creates the UI for a backend.
-func NewModel(be Backend) *Model { return &Model{be: be, row: rowL1, col: 1} }
+func NewModel(be Backend) *Model { return &Model{be: be, row: rowL1, col: 1, resSeat: -1} }
 
 // Init implements tea.Model.
 func (m *Model) Init() tea.Cmd { return nil }
@@ -96,6 +97,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if old == nil || keyOf(old) != keyOf(&v) {
 			m.sel = engine.Gems{}
 			m.err = ""
+		}
+		if m.resSeat < 0 || m.resSeat >= len(v.Players) {
+			m.resSeat = max(v.Viewer, 0)
 		}
 		m.clampCursor()
 	case LogMsg:
@@ -259,6 +263,9 @@ func (m *Model) key(k string) tea.Cmd {
 		m.sel = engine.Gems{}
 		m.err = ""
 		return nil
+	case "tab":
+		m.cycleReserved()
+		return nil
 	}
 	if m.view == nil || (m.room != nil && m.room.Status == "waiting") {
 		if k == "s" {
@@ -299,6 +306,14 @@ func (m *Model) key(k string) tea.Cmd {
 	return nil
 }
 
+func (m *Model) cycleReserved() {
+	if m.view == nil || len(m.view.Players) == 0 {
+		return
+	}
+	m.resSeat = (max(m.resSeat, 0) + 1) % len(m.view.Players)
+	m.status = "查看 " + m.seatName(m.resSeat) + " 的预留"
+}
+
 func (m *Model) requestHint() {
 	if m.room != nil && !m.room.Hints {
 		m.fail("本房间未开启提示")
@@ -313,7 +328,7 @@ func (m *Model) requestHint() {
 	}
 	k := keyOf(m.view)
 	m.hintReq = &k
-	m.status = "困难 AI 思考中…"
+	m.status = "大师 AI 思考中…"
 	m.be.Hint()
 }
 

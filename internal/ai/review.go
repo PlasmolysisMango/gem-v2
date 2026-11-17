@@ -28,7 +28,7 @@ func (h *HardAgent) Review(m *engine.GameState, seat int, an *Analysis, played e
 	if normalize(played) == normalize(best.Action) {
 		r.PlayedWinRate, r.BestWinRate = best.WinRate, best.WinRate
 		r.Verdict, r.VerdictText = "best", "最佳着法"
-		r.Comment = "与困难 AI 的首选一致"
+		r.Comment = "与" + h.Level().Name() + " AI 的首选一致"
 		return r
 	}
 	est := h.EstimateActions(m, seat, []engine.Action{best.Action, played}, 96)

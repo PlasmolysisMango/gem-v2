@@ -238,6 +238,7 @@ func TestOnlineGame(t *testing.T) {
 	cfg := game.DefaultConfig()
 	cfg.AIDelay = 0
 	cfg.HardBudget = 50 * time.Millisecond
+	cfg.MasterBudget = 50 * time.Millisecond
 	cfg.HintBudget = 60 * time.Millisecond
 	hub := game.NewHub(st, cfg)
 	a := auth.New(st, []byte("test-secret"))
@@ -264,7 +265,7 @@ func TestOnlineGame(t *testing.T) {
 	if err := (&Client{Server: srv.URL}).Login("cliuser", "wrong-pw", false); err == nil {
 		t.Fatal("wrong password accepted")
 	}
-	room, err := c.CreateRoom(game.RoomSettings{Seats: 2, AIs: []string{"hard"}})
+	room, err := c.CreateRoom(game.RoomSettings{Seats: 2, AIs: []string{"master"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -298,7 +299,7 @@ func TestViewFitsTerminal(t *testing.T) {
 			{Index: 0, Kind: game.SeatHuman, Name: "me"},
 			{Index: 1, Kind: game.SeatAI, Name: "bot1", Level: "hard"},
 			{Index: 2, Kind: game.SeatAI, Name: "bot2", Level: "hard"},
-			{Index: 3, Kind: game.SeatAI, Name: "bot3", Level: "hard"},
+			{Index: 3, Kind: game.SeatAI, Name: "bot3", Level: "master"},
 		}}})
 	v := g.ViewFor(0)
 	m.Update(ViewMsg{View: v})
@@ -332,5 +333,13 @@ func TestViewFitsTerminal(t *testing.T) {
 		if sz[0] >= 120 && !strings.Contains(out, "最近动作") {
 			t.Fatalf("%dx%d: recent actions missing", sz[0], sz[1])
 		}
+		if sz[0] >= 120 && !strings.Contains(out, "预留 · ") {
+			t.Fatalf("%dx%d: reserved panel missing", sz[0], sz[1])
+		}
+	}
+	m.width, m.height = 120, 40
+	m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	if out := m.View(); !strings.Contains(out, "预留 · bot1") {
+		t.Fatalf("Tab did not switch the reserved panel: %s", out)
 	}
 }

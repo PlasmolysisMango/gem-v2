@@ -121,7 +121,7 @@ func (h *Hub) restoreRoom(ctx context.Context, rec store.RoomRecord) (*Room, err
 			continue
 		}
 		var an ai.Analysis
-		if json.Unmarshal([]byte(row.Analysis), &an) == nil {
+		if json.Unmarshal([]byte(row.Analysis), &an) == nil && an.Level == ai.Master {
 			r.hintCache[seatIdx] = hintEntry{seq: row.Seq, an: &an}
 		}
 	}
@@ -142,9 +142,12 @@ func (h *Hub) restoreRoom(ctx context.Context, rec store.RoomRecord) (*Room, err
 		if st.kind != SeatAI {
 			continue
 		}
-		if st.level == ai.Hard {
+		switch st.level {
+		case ai.Hard:
 			r.agents[i] = ai.NewHard(h.cfg.HardBudget)
-		} else {
+		case ai.Master:
+			r.agents[i] = ai.NewMaster(h.cfg.MasterBudget)
+		default:
 			r.agents[i] = ai.New(st.level)
 		}
 	}

@@ -3,7 +3,7 @@ import type { Envelope } from './types'
 
 type Handler = (e: Envelope<any>) => void
 
-/** Reconnecting WebSocket client for /ws (token passed as query parameter). */
+/** Reconnecting WebSocket client for /ws (gateway cookie authenticates the handshake). */
 export class Socket {
   private ws: WebSocket | null = null
   private queue: string[] = []
@@ -14,12 +14,10 @@ export class Socket {
   onStatus: (connected: boolean) => void = () => {}
   onOpen: () => void = () => {}
 
-  constructor(private token: string) {}
-
   connect() {
     this.closed = false
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const ws = new WebSocket(`${proto}://${location.host}${appUrl('ws')}?token=${encodeURIComponent(this.token)}`)
+    const ws = new WebSocket(`${proto}://${location.host}${appUrl('ws')}`)
     this.ws = ws
     ws.onopen = () => {
       this.retry = 0

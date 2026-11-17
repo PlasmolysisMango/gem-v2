@@ -1,9 +1,8 @@
 import { useEffect } from 'react'
-import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { api, setUnauthorizedHandler } from './api/http'
+import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { api } from './api/http'
 import { useAuth } from './store/auth'
 import { useGame } from './store/game'
-import Login from './pages/Login'
 import Lobby from './pages/Lobby'
 import Room from './pages/Room'
 import Replay from './pages/Replay'
@@ -11,34 +10,33 @@ import Stats from './pages/Stats'
 import Admin from './pages/Admin'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  const token = useAuth((s) => s.token)
-  if (!token) return <Navigate to="/login" replace />
+  const { user, ready } = useAuth()
+  if (!ready) return null
+  if (!user) {
+    window.location.assign(`/login?next=${encodeURIComponent(location.pathname + location.search)}`)
+    return null
+  }
   return children
 }
 
 export default function App() {
-  const { token, user, logout } = useAuth()
-  const setUser = useAuth((s) => s.setUser)
+  const { user, hydrate, setUser, logout } = useAuth()
   const connect = useGame((s) => s.connect)
   const disconnect = useGame((s) => s.disconnect)
   const connected = useGame((s) => s.connected)
-  const nav = useNavigate()
 
   useEffect(() => {
-    setUnauthorizedHandler(() => {
-      logout()
-      nav('/login')
-    })
-  }, [logout, nav])
+    void hydrate()
+  }, [hydrate])
 
   useEffect(() => {
-    if (token) connect(token)
+    if (user) connect()
     else disconnect()
-  }, [token, connect, disconnect])
+  }, [user, connect, disconnect])
 
   // Refresh the profile so role changes (and users cached by older clients) are picked up.
   useEffect(() => {
-    if (!token) return
+    if (!user) return
     let alive = true
     api
       .me()
@@ -47,7 +45,7 @@ export default function App() {
     return () => {
       alive = false
     }
-  }, [token, setUser])
+  }, [user?.id, setUser])
 
   return (
     <div className="app-shell">
@@ -72,13 +70,10 @@ export default function App() {
               <span className={`inline-block w-2 h-2 rounded-full mr-1 ${connected ? 'bg-emerald-400' : 'bg-rose-500'}`} />
               {user.username}
             </span>
-            <button
-              className="btn text-sm"
-              onClick={() => {
-                logout()
-                nav('/login')
-              }}
-            >
+            <a href="/" className="hidden sm:inline text-sm text-slate-400 hover:text-sky-300">
+              统一门户
+            </a>
+            <button className="btn text-sm" onClick={logout}>
               退出
             </button>
           </>
@@ -86,7 +81,6 @@ export default function App() {
       </header>
       <main className="app-main min-w-0 p-2 sm:p-4">
         <Routes>
-          <Route path="/login" element={<Login />} />
           <Route
             path="/"
             element={

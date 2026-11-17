@@ -201,19 +201,38 @@ func (m *Model) renderBank() string {
 	return label + " " + strings.Join(parts, " ")
 }
 
-func (m *Model) renderReserved() string {
-	me := m.me()
-	if me == nil {
+// reservedContent shows one seat's reserved cards. The viewer's own cards keep
+// the cursor/buy marks; opponents' cards are read-only, with deck reserves hidden.
+func (m *Model) reservedContent(w int) string {
+	v := m.view
+	if v == nil || len(v.Players) == 0 {
 		return ""
 	}
-	if len(me.Reserved) == 0 {
-		return stDim.Render("我的预留：无")
+	seat := m.resSeat
+	if seat < 0 || seat >= len(v.Players) {
+		seat = max(v.Viewer, 0)
 	}
-	var boxes []string
-	for i, cv := range me.Reserved {
-		boxes = append(boxes, m.cardBox(rowReserved, i, cv, engine.ActBuyReserved))
+	p := v.Players[seat]
+	title := fmt.Sprintf("预留 · %s%s", m.seatName(seat), stDim.Render("  Tab 切换"))
+	if len(p.Reserved) == 0 {
+		return title + "\n" + stDim.Render("（无）")
 	}
-	return "我的预留\n" + lipgloss.JoinHorizontal(lipgloss.Top, boxes...)
+	own := seat == v.Viewer
+	perRow := max(1, (w-2)/13) // a card box is 13 cells wide
+	var rows []string
+	for start := 0; start < len(p.Reserved); start += perRow {
+		var boxes []string
+		for i := start; i < min(start+perRow, len(p.Reserved)); i++ {
+			cv := p.Reserved[i]
+			if own {
+				boxes = append(boxes, m.cardBox(rowReserved, i, cv, engine.ActBuyReserved))
+			} else {
+				boxes = append(boxes, box(cardLines(cv), markNone))
+			}
+		}
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, boxes...))
+	}
+	return title + "\n" + lipgloss.JoinVertical(lipgloss.Left, rows...)
 }
 
 func (m *Model) seatName(i int) string {
@@ -243,37 +262,61 @@ func aiName(s game.SeatInfo) string {
 	return fmt.Sprintf("%s(AI·%s)", s.Name, lv)
 }
 
-func (m *Model) renderPlayers() string {
+// renderPlayersGrid lays every seat out in its own box, two per row, starting
+// with the viewer. The active seat gets a highlighted border.
+func (m *Model) renderPlayersGrid(w int) string {
 	v := m.view
-	var out []string
-	n := len(v.Players)
-	start := max(v.Viewer, 0)
-	for k := 0; k < n; k++ {
-		p := v.Players[(start+k)%n]
-		head := "  "
-		if p.Seat == v.Current && v.Phase != engine.PhaseOver {
-			head = stTitle.Render("▶ ")
-		}
-		head += fmt.Sprintf("%s  %s  卡%d 贵族%d 预留%d", m.seatName(p.Seat), stTitle.Render(fmt.Sprintf("%d分", p.Points)), p.NCards, len(p.Nobles), len(p.Reserved))
-		var bon engine.Gems
-		copy(bon[:engine.NumGemColors], p.Bonuses[:])
-		out = append(out, head,
-			fmt.Sprintf("    筹码 %s  (%d/10)", gemsLine(p.Tokens, engine.NumColors), p.Tokens.Total()),
-			"    奖励 "+gemsLine(bon, engine.NumGemColors))
+	if v == nil || len(v.Players) == 0 {
+		return ""
 	}
-	return strings.Join(out, "\n")
+	const cols, gap = 2, 1
+	colW := (w - gap - 2*cols) / cols // Width excludes the two border cells per box
+	start := max(v.Viewer, 0)
+	var rows []string
+	for k := 0; k < len(v.Players); k += cols {
+		var boxes []string
+		for j := k; j < min(k+cols, len(v.Players)); j++ {
+			if len(boxes) > 0 {
+				boxes = append(boxes, strings.Repeat(" ", gap))
+			}
+			boxes = append(boxes, m.playerBox((start+j)%len(v.Players), colW))
+		}
+		rows = append(rows, lipgloss.JoinHorizontal(lipgloss.Top, boxes...))
+	}
+	return lipgloss.JoinVertical(lipgloss.Left, rows...)
+}
+
+func (m *Model) playerBox(seat, w int) string {
+	v := m.view
+	p := v.Players[seat]
+	active := p.Seat == v.Current && v.Phase != engine.PhaseOver
+	head := "  "
+	if active {
+		head = stTitle.Render("▶ ")
+	}
+	head += fmt.Sprintf("%s  %s 卡%d 贵族%d 预留%d", m.seatName(seat), stTitle.Render(fmt.Sprintf("%d分", p.Points)),
+		p.NCards, len(p.Nobles), len(p.Reserved))
+	var bon engine.Gems
+	copy(bon[:engine.NumGemColors], p.Bonuses[:])
+	content := fmt.Sprintf("%s\n筹码 %s (%d/10)\n奖励 %s", head,
+		gemsLine(p.Tokens, engine.NumColors), p.Tokens.Total(), gemsLine(bon, engine.NumGemColors))
+	style := stSection
+	if active {
+		style = style.BorderForeground(lipgloss.Color("#facc15"))
+	}
+	return clipSection(content, style, w, 0)
 }
 
 func (m *Model) renderHint() string {
 	h := m.currentHint()
 	if h == nil {
 		if m.hintReq != nil {
-			return stHint.Render("困难 AI 思考中…")
+			return stHint.Render("大师 AI 思考中…")
 		}
 		if m.room != nil && !m.room.Hints {
 			return stDim.Render("本房间未开启提示")
 		}
-		return stDim.Render("按 h 请求困难 AI 提示")
+		return stDim.Render("按 h 请求大师 AI 提示")
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s 策略：%s  胜率 %.1f%%  (%d 次模拟)\n", stHint.Render("提示"), h.StrategyText, h.WinRate*100, h.Iterations)
@@ -338,6 +381,10 @@ func wrapTo(s string, w int) string {
 // boxClip renders text in a section box, keeping the content within maxH total
 // lines (border included). maxH <= 0 means unlimited.
 func boxClip(text string, w, maxH int) string {
+	return clipSection(text, stSection, w, maxH)
+}
+
+func clipSection(text string, style lipgloss.Style, w, maxH int) string {
 	lineW := w
 	if lineW > 2 {
 		lineW -= 2 // section horizontal padding
@@ -352,7 +399,7 @@ func boxClip(text string, w, maxH int) string {
 			ls = ls[:inner]
 		}
 	}
-	return stSection.Width(w).Render(strings.Join(ls, "\n"))
+	return style.Width(w).Render(strings.Join(ls, "\n"))
 }
 
 // hintBox is the hint panel with a total height budget.
@@ -410,15 +457,15 @@ func (m *Model) help() string {
 		return "q 退出  l 日志"
 	}
 	if !m.myTurn() {
-		return "等待其他玩家…   l 日志  q 退出"
+		return "等待其他玩家…  Tab 看预留  l 日志  q 退出"
 	}
 	switch m.view.Phase {
 	case engine.PhaseDiscard:
-		return "1-6 选择归还的筹码（再按超过持有数清零）  Enter 确认  Esc 清空  h 提示"
+		return "1-6 选择归还的筹码（再按超过持有数清零）  Enter 确认  Esc 清空  h 提示  Tab 看预留"
 	case engine.PhaseNoble:
-		return "1-9 选择要迎接的贵族  h 提示"
+		return "1-9 选择要迎接的贵族  h 提示  Tab 看预留"
 	}
-	return "方向键 移动  1-5/空格 选色  Enter 拿取  b 购买  r 预留/盲扣  Esc 清空  h 提示  y 执行提示  l 日志  q 退出"
+	return "方向键 移动  1-5/空格 选色  Enter 拿取  b 购买  r 预留/盲扣  Esc 清空  h 提示  y 执行提示  Tab 看预留  l 日志  q 退出"
 }
 
 func (m *Model) renderNoblePick() string {
@@ -542,13 +589,6 @@ func (m *Model) View() string {
 	if m.myTurn() {
 		turn = stOK.Render("轮到你了")
 	}
-	left := []string{stTitle.Render(title) + "   " + turn, m.renderNobles(), m.renderBoard(), m.renderBank(), m.renderReserved()}
-	if np := m.renderNoblePick(); np != "" {
-		left = append(left, np)
-	}
-	left = append(left, status, stDim.Render(m.help()))
-	leftText := lipgloss.JoinVertical(lipgloss.Left, left...)
-
 	rightW := defaultRight
 	stacked := false
 	if m.width > 0 {
@@ -558,6 +598,18 @@ func (m *Model) View() string {
 			rightW = min(defaultRight, m.width-boardWidth-4)
 		}
 	}
+	left := []string{stTitle.Render(title) + "   " + turn, m.renderNobles(), m.renderBoard(), m.renderBank(),
+		m.renderPlayersGrid(boardWidth)}
+	if stacked {
+		// No side column here: keep the reserved panel under the player boxes.
+		left = append(left, boxClip(m.reservedContent(boardWidth), boardWidth, 0))
+	}
+	if np := m.renderNoblePick(); np != "" {
+		left = append(left, np)
+	}
+	left = append(left, status, stDim.Render(m.help()))
+	leftText := lipgloss.JoinVertical(lipgloss.Left, left...)
+
 	if stacked {
 		return m.renderStacked(leftText)
 	}
@@ -566,13 +618,12 @@ func (m *Model) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, l, "  ", r)
 }
 
-// renderRightPanel stacks the players, hint, review and recent actions so the
-// column fits h terminal lines. The hint shrinks first; the action log keeps at
-// least a heading, so the top of the screen never scrolls away.
+// renderRightPanel stacks the hint, review, recent actions and reserved cards so
+// the column fits h terminal lines. The hint shrinks first; the reserved panel
+// stays at the bottom, and the action log keeps at least a heading.
 func (m *Model) renderRightPanel(w, h int) string {
-	players := stSection.Width(w).Render(m.renderPlayers())
-	parts := []string{players}
-	used := panelHeight(players)
+	var parts []string
+	used := 0
 
 	review := ""
 	if r := m.renderReview(); r != "" {
@@ -580,17 +631,28 @@ func (m *Model) renderRightPanel(w, h int) string {
 		used += panelHeight(review)
 	}
 
+	reserved := m.reservedContent(w)
+	reservedH := 0
+	if reserved != "" {
+		reservedH = min(panelHeight(reserved)+2, 15) // at most two card rows
+	}
+
 	recentH, hintH := 0, 0
 	if h > 0 {
 		const minHint = 5 // border + three content lines
 		recentH = 9       // border + heading + six actions
-		if avail := h - used - minHint; avail < recentH {
+		avail := h - used - minHint - reservedH
+		if avail < recentH {
 			recentH = max(3, avail)
 		}
-		hintH = h - used - recentH
+		hintH = h - used - recentH - reservedH
 		if hintH < minHint {
-			recentH = max(3, h-used-minHint)
-			hintH = h - used - recentH
+			recentH = max(3, h-used-reservedH-minHint)
+			hintH = h - used - recentH - reservedH
+		}
+		if hintH < minHint && reservedH > 4 {
+			reservedH = max(4, h-used-recentH-minHint)
+			hintH = h - used - recentH - reservedH
 		}
 		hintH = max(hintH, 3)
 	}
@@ -603,6 +665,9 @@ func (m *Model) renderRightPanel(w, h int) string {
 		parts = append(parts, review)
 	}
 	parts = append(parts, m.recentBox(w, recentH))
+	if reserved != "" {
+		parts = append(parts, boxClip(reserved, w, reservedH))
+	}
 	return clip(lipgloss.JoinVertical(lipgloss.Left, parts...), h)
 }
 

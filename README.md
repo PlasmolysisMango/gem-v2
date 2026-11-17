@@ -4,9 +4,9 @@
 
 - **服务端权威**：规则判定、AI 计算、提示分析全部在服务端完成。每个客户端只收到按座位过滤后的视图，看不到牌堆顺序，也看不到对手从牌堆暗扣的牌。
 - **账号**：用户名 + 密码（bcrypt 哈希）登录，签发 JWT（HS256，24 小时有效），数据存 SQLite（纯 Go 的 `modernc.org/sqlite`，无需 CGO）。
-- **多人联机**：大厅、房间、2–4 人对局，可自由混合真人座位和简单 / 中等 / 困难三档 AI；支持断线重连、回合计时。
+- **多人联机**：大厅、房间、2–4 人对局，可自由混合真人座位和简单 / 中等 / 困难 / 大师四档 AI；支持断线重连、回合计时。
 - **房间持久化**：等待中和进行中的房间写入 SQLite，服务重启后自动恢复（含局面、提示缓存、胜率曲线与复盘）。无在线真人时对局暂停等待，断线真人不会被 AI 托管；长时间无人访问的房间按管理员配置的时长自动清理（默认 7 天）。
-- **高手 AI 与提示**：困难 AI 基于信息集 MCTS 实时演算，并在残局切换为精确搜索。提示功能使用同一个困难 AI，给出前 3 个候选着法、各自胜率、预期后续着法以及中文原因；练习时每一步走完都会复盘，标出失误。
+- **高手 AI 与提示**：困难和大师 AI 基于信息集 MCTS 实时演算，大师档使用更长预算与并行搜索，并在残局切换为精确搜索。提示功能默认使用大师 AI，给出前 3 个候选着法、各自胜率、预期后续着法以及中文原因；练习时每一步走完都会复盘，标出失误。
 - **部署**：`./deploy.sh` 生成独立 Go 二进制和静态资源，生产环境由 nginx 托管前端并代理 API / WebSocket；`deploy/deploy.sh` 按本机其他服务的方式一键部署到 nginx 子路径 `/gem/`；也保留 `make build` 的 `embed` 单文件构建方式。
 
 ## 快速开始
@@ -150,8 +150,9 @@ sudo systemctl reload nginx
 | `-db` | `GEM_DB` | `gem.db` | SQLite 文件路径 |
 | `-secret` | `GEM_JWT_SECRET` | 随机 | JWT 密钥；不设置时每次重启都会生成新密钥，已签发的登录会失效 |
 | `-static` | `GEM_STATIC` | 无（`embed` 构建时内嵌） | 可从指定目录提供前端；nginx 部署时不设置 |
-| `-hard-ms` | | 1500 | 困难 AI 每步的思考时间 |
-| `-hint-ms` | | 1500 | 提示分析时间 |
+| `-hard-ms` | | 300 | 困难 AI 每步的思考时间（单线程） |
+| `-master-ms` | | 1500 | 大师 AI 每步的思考时间 |
+| `-hint-ms` | | 1500 | 大师 AI 提示分析时间 |
 | `-ai-delay-ms` | | 600 | AI 出手的最短展示延迟 |
 | `-admin-user` | `GEM_ADMIN_USER` | `mango` | 启动时把该账号提升为管理员（空值禁用） |
 | `-idle-close` | `GEM_IDLE_CLOSE` | `168h` | 无客户端连接的房间在该时长后自动关闭；`0` 表示不自动清理。仅作为 settings 表无记录时的初始值，管理页修改后以数据库为准 |
@@ -181,7 +182,7 @@ docker run -d -p 8080:8080 -v gem-data:/data -e GEM_JWT_SECRET=change-me gem-ser
 | `make dev` | 同时启动 Go 服务和 Vite 开发服务器 |
 | `make test` | `go vet` + `go test ./...` + 前端 `vitest` |
 | `make build` | 构建前端，再编译 `bin/gem-server`（内嵌前端）、`bin/gem-cli`、`bin/gem-arena` |
-| `make arena` | AI 自对弈评测，例如 `make arena A=hard B=medium GAMES=500 PARALLEL=8 WORKERS=6` |
+| `make arena` | AI 自对弈评测，例如 `make arena A=master B=medium GAMES=500 PARALLEL=8 WORKERS=6` |
 | `make docker` | 构建 Docker 镜像 |
 
 如果 pnpm 不在 PATH 中，可以这样指定：`make build PNPM="npx pnpm"`。
@@ -216,11 +217,11 @@ bin/gem-cli login -server http://localhost:8080 -register alice   # 注册并登
 bin/gem-cli rooms                                                 # 查看大厅
 bin/gem-cli create -seats 3 -ai hard                              # 3 人房：你 + 困难 AI + 1 个空位
 bin/gem-cli join ABC123                                           # 加入房间，或重连到进行中的对局
-bin/gem-cli play -ai hard,medium                                  # 在服务器开一个练习房
-bin/gem-cli play -offline -ai hard -budget 1.5s                   # 离线对战本地 AI，不需要服务器
+bin/gem-cli play -ai master,medium                                # 在服务器开一个练习房
+bin/gem-cli play -offline -ai master -budget 1.5s                 # 离线对战本地 AI，不需要服务器
 ```
 
-CLI 与 Web 使用同一套 HTTP/WS 协议，因此可以和网页玩家在同一个房间对局。
+CLI 与 Web 使用同一套 HTTP/WS 协议，因此可以和网页玩家在同一个房间对局。棋盘下方是每位玩家独立的资源框（4 人为 2×2 排列），右下角预留面板默认显示自己的预留，按 `Tab` 可查看其他玩家。
 
 **键位**
 
@@ -234,6 +235,7 @@ CLI 与 Web 使用同一套 HTTP/WS 协议，因此可以和网页玩家在同�
 | `r` | 预留光标所在的卡；光标在牌堆列时为暗扣 |
 | `h` | 请求提示 |
 | `y` | 执行提示的首选着法 |
+| `Tab` | 右下角预留面板在玩家之间切换（默认显示自己的预留） |
 | `s` | 房主开局 |
 | `l` | 查看完整日志 |
 | `q` | 退出 |
@@ -249,7 +251,7 @@ cmd/gem-server   HTTP + WebSocket 服务
 cmd/gem-cli      终端客户端（Bubble Tea）
 cmd/gem-arena    AI 自对弈评测与调参
 internal/engine  纯规则引擎：卡牌数据、阶段机、合法动作、视图过滤与确定化
-internal/ai      特征、评估、三档 AI、残局搜索、提示解释、走后复盘
+internal/ai      特征、评估、四档 AI、残局搜索、提示解释、走后复盘
 internal/arena   批量对局与统计
 internal/auth    bcrypt、JWT、HTTP/WS 鉴权中间件
 internal/store   SQLite 仓储与嵌入式迁移（users / games / game_actions / rooms / settings / 提示与曲线）
@@ -282,7 +284,7 @@ WebSocket 地址为 `/ws?token=...`，消息统一使用 JSON 信封 `{type, roo
 
 ## AI 设计
 
-所有 AI 都实现同一个接口 `Agent.Choose(ctx, view, seat)`。AI 只能看到 `ViewFor` 过滤后的信息：对手暗扣的牌和牌堆顺序都是未知的，困难 AI 每次迭代都会随机补全这些隐藏信息（确定化），不作弊。
+所有 AI 都实现同一个接口 `Agent.Choose(ctx, view, seat)`。AI 只能看到 `ViewFor` 过滤后的信息：对手暗扣的牌和牌堆顺序都是未知的，困难和大师 AI 每次迭代都会随机补全这些隐藏信息（确定化），不作弊。
 
 ### 评估函数（依据 BGA 高手攻略整理）
 
@@ -298,26 +300,27 @@ WebSocket 地址为 `/ws?token=...`，消息统一使用 JSON 信封 `{type, roo
 - **相对评估**：用自己的价值减去对手的价值，再通过 sigmoid 转换成胜率。这样能自然体现封锁收益，例如拿走对手需要的颜色，或预留掉对手的目标卡。
 - **资源**：接近 10 枚筹码上限时，多余筹码有浪费惩罚。
 
-### 三档难度
+### 四档难度
 
 | 难度 | 做法 |
 | --- | --- |
-| 简单 | 只看一步，只评估自己的局面（不封锁，不考虑对手），用较高温度的 softmax 选择，并有 ε=0.2 的概率随机走一步合法动作 |
+| 简单 | 只看一步，只评估自己的局面（不封锁，不考虑对手），用较高温度的 softmax 选择，并有 ε=0.1 的概率随机走一步合法动作 |
 | 中等 | 使用完整评估函数，前 K 个候选做一轮前瞻：每个对手用启发式选出最佳回应后，再评估局面。附带威胁检测与封锁 |
-| 困难 | ISMCTS 结合残局搜索，详见下文 |
+| 困难 | 单线程 ISMCTS，默认每步搜索 300ms，结合残局搜索 |
+| 大师 | 并行 ISMCTS，默认每步搜索 1.5s，结合残局搜索；也是提示与走后复盘的默认分析器 |
 
-困难 AI 的具体做法（`hard.go`、`endgame.go`）：
+困难 / 大师 AI 的具体做法（`hard.go`、`endgame.go`）：
 
 - **ISMCTS（信息集 MCTS）**：每次迭代对隐藏牌重新确定化。选择阶段采用 PUCT，先验概率来自启发式评分的 softmax。
 - **动作剪枝**：只保留启发式排名前 K 的动作，买卡和预留始终保留。
 - **rollout**：用轻量的 ε-贪心策略模拟若干步，然后截断，用评估函数估算胜率。
-- **根并行**：开 `NumCPU` 个 goroutine，各自建树，最后合并访问次数。时间预算默认每步 1.5 秒。
+- **搜索预算**：困难档固定单线程、默认每步 300ms；大师档最多开 8 个 goroutine，各自建树，最后合并访问次数，默认每步 1.5 秒。
 - **残局**：任一玩家达到 12 分或进入最后一轮时，并行运行 paranoid 深度搜索（假设对手全力压制自己）。搜索在多个确定化样本上精确判定必胜着法和必须封锁的着法，结果与树搜索融合。
 - **离散子阶段**：弃牌、选贵族直接用评估函数选最优，不进入树搜索。
 
 ### 提示与原因
 
-`explain.go`、`review.go`：提示由困难 AI 在玩家自己的视角上分析，返回以下内容：
+`explain.go`、`review.go`：提示由大师 AI 在玩家自己的视角上分析，返回以下内容：
 
 - 前 3 个候选着法，每个附带估计胜率和访问次数。
 - 预期后续着法（2–3 手）。
@@ -339,14 +342,14 @@ WebSocket 地址为 `/ws?token=...`，消息统一使用 JSON 信封 `{type, roo
 | 对局 | 局数 | A 胜率 | 目标 |
 | --- | --- | --- | --- |
 | 中等 vs 简单（2 人） | 500 | 81.0% | ≥ 80% |
-| 困难 vs 中等（2 人，1.5 s/步） | 500 | **96.8%**（困难平均每步思考 1.39 s） | ≥ 70%，单步 ≤ 2 s |
-| 困难 vs 2×中等（3 人） | — | 75%（随机期望 33%） | — |
+| 大师 vs 中等（2 人，1.5 s/步） | 500 | **96.8%**（大师平均每步思考 1.39 s） | ≥ 70%，单步 ≤ 2 s |
+| 大师 vs 2×中等（3 人） | — | 75%（随机期望 33%） | — |
 
 复现：
 
 ```bash
 make arena A=medium B=easy GAMES=500 PARALLEL=16
-make arena A=hard B=medium GAMES=500 PARALLEL=8 WORKERS=6   # 48 核机器约 50 分钟
+make arena A=master B=medium GAMES=500 PARALLEL=8 WORKERS=6   # 48 核机器约 50 分钟
 ```
 
 调参：`gem-arena -tune N` 会对中等 AI 的权重做爬山扰动，并输出建议写回 `weights.go` 的权重值。

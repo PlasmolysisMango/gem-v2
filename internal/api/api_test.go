@@ -29,6 +29,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *game.Hub, *store.Store) {
 	cfg := game.DefaultConfig()
 	cfg.AIDelay = 0
 	cfg.HardBudget = 50 * time.Millisecond
+	cfg.MasterBudget = 50 * time.Millisecond
 	cfg.HintBudget = 60 * time.Millisecond
 	hub := game.NewHub(st, cfg)
 	a := auth.New(st, []byte("test-secret"))

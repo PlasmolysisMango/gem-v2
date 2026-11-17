@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/http'
 import type { AILevel, RoomSummary } from '../api/types'
 
-export const LEVEL_NAME: Record<AILevel, string> = { easy: '简单', medium: '中等', hard: '困难' }
+export const LEVEL_NAME: Record<AILevel, string> = { easy: '简单', medium: '中等', hard: '困难', master: '大师' }
 const STATUS_NAME: Record<string, string> = { waiting: '等待中', playing: '对局中', finished: '已结束' }
 
 type SeatChoice = 'human' | AILevel
@@ -14,7 +14,7 @@ export default function Lobby() {
   const [error, setError] = useState('')
   const [name, setName] = useState('')
   const [seats, setSeats] = useState(2)
-  const [others, setOthers] = useState<SeatChoice[]>(['hard', 'medium', 'easy'])
+  const [others, setOthers] = useState<SeatChoice[]>(['master', 'medium', 'easy'])
   const [hints, setHints] = useState<'auto' | 'on' | 'off'>('auto')
   const [turnSeconds, setTurnSeconds] = useState(0)
   const [joinId, setJoinId] = useState('')
@@ -135,7 +135,7 @@ export default function Lobby() {
           <h2 className="text-lg font-bold">快速练习</h2>
           <p className="text-xs text-slate-400">与 AI 一对一，默认开启提示与走后复盘。</p>
           <div className="flex gap-2">
-            {(['easy', 'medium', 'hard'] as AILevel[]).map((l) => (
+            {(['easy', 'medium', 'hard', 'master'] as AILevel[]).map((l) => (
               <button key={l} className="btn-primary flex-1" disabled={busy} onClick={() => create({ ai: [l] })}>
                 {LEVEL_NAME[l]}
               </button>
@@ -174,6 +174,7 @@ export default function Lobby() {
                   <option value="easy">AI · 简单</option>
                   <option value="medium">AI · 中等</option>
                   <option value="hard">AI · 困难</option>
+                  <option value="master">AI · 大师</option>
                 </select>
               </div>
             ))}

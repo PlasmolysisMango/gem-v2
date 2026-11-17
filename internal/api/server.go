@@ -42,7 +42,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/admin/settings", s.adminOnly(s.adminGetSettings))
 	mux.Handle("PUT /api/admin/settings", s.adminOnly(s.adminPutSettings))
 	mux.Handle("DELETE /api/admin/rooms/{id}", s.adminOnly(s.adminCloseRoom))
-	mux.HandleFunc("GET /ws", s.ws)
+	mux.Handle("GET /ws", protected(s.ws))
 	if s.Static != nil {
 		mux.Handle("/", spa(s.Static))
 	}
@@ -71,6 +71,10 @@ type AuthResponse struct {
 }
 
 func (s *Server) register(w http.ResponseWriter, r *http.Request) {
+	if s.Auth.Entry != nil {
+		writeErr(w, 410, "请通过统一门户注册")
+		return
+	}
 	var c credentials
 	if json.NewDecoder(r.Body).Decode(&c) != nil {
 		writeErr(w, 400, "请求格式错误")
@@ -90,6 +94,10 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
+	if s.Auth.Entry != nil {
+		writeErr(w, 410, "请通过统一门户登录")
+		return
+	}
 	var c credentials
 	if json.NewDecoder(r.Body).Decode(&c) != nil {
 		writeErr(w, 400, "请求格式错误")
@@ -111,6 +119,22 @@ func (s *Server) me(w http.ResponseWriter, r *http.Request) {
 	u, err := s.Store.UserByID(r.Context(), id.UserID)
 	if err != nil {
 		writeErr(w, 401, auth.ErrToken.Error())
+		return
+	}
+	if s.Auth.Entry != nil {
+		gw, err := s.Auth.Entry.Identity(r)
+		if err != nil {
+			writeErr(w, 401, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]any{
+			"id": u.ID, "username": u.Username, "externalId": u.ExternalID,
+			"isAdmin": id.IsAdmin(), "createdAt": u.CreatedAt,
+			"entry": map[string]string{
+				"uid": gw.UID, "username": gw.Username, "displayName": gw.DisplayName,
+				"role": gw.Role, "grants": gw.Grants,
+			},
+		})
 		return
 	}
 	writeJSON(w, 200, u)

@@ -24,6 +24,10 @@ func (s *Server) adminOnly(next http.HandlerFunc) http.Handler {
 			writeErr(w, 401, auth.ErrToken.Error())
 			return
 		}
+		if id.IsAdmin() {
+			next(w, r)
+			return
+		}
 		u, err := s.Store.UserByID(r.Context(), id.UserID)
 		if err != nil {
 			writeErr(w, 401, auth.ErrToken.Error())
