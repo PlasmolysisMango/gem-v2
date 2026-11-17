@@ -176,7 +176,7 @@ if [[ "$page_code" != "302" ]]; then
 fi
 curl -fsSk --resolve "${public_host}:443:127.0.0.1" \
   "${PUBLIC_ORIGIN}${asset_path}" >/dev/null
-ws_code="$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 \
+ws_code="$(curl --http1.1 -sk -o /dev/null -w '%{http_code}' --max-time 5 \
   --resolve "${public_host}:443:127.0.0.1" \
   -H 'Connection: Upgrade' -H 'Upgrade: websocket' \
   -H 'Sec-WebSocket-Version: 13' -H 'Sec-WebSocket-Key: Z2VtLXByb2JlLTEyMzQ1Ng==' \
