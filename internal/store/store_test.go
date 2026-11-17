@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 )
 
@@ -69,6 +70,51 @@ func TestStoreRoundTrip(t *testing.T) {
 	}
 	if g, _ := st.Game(ctx, gid); g.Status != "finished" {
 		t.Fatalf("finished game changed: %+v", g)
+	}
+}
+
+func TestReplayAnalysisSurvivesReopen(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "replay.db")
+	st, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	gid, err := st.CreateGame(ctx, "REPLAY", 7, []GamePlayer{{Seat: 0, AILevel: "easy"}, {Seat: 1, AILevel: "medium"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for seq := 0; seq < 2; seq++ {
+		if err := st.AddAction(ctx, gid, seq, 0, `{}`); err != nil {
+			t.Fatal(err)
+		}
+		if err := st.SaveReplayAnalysis(ctx, gid, 0, seq, seq+1, `{"level":"master"}`, `{"verdict":"best"}`, 0.4, 0.5); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := st.Close(); err != nil {
+		t.Fatal(err)
+	}
+	st, err = Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	hints, err := st.ReplayHints(ctx, gid)
+	if err != nil || len(hints) != 2 {
+		t.Fatalf("all hints: %v %+v", err, hints)
+	}
+	latest, err := st.HintsByGame(ctx, gid)
+	if err != nil || latest[0].Seq != 1 {
+		t.Fatalf("latest hint: %v %+v", err, latest)
+	}
+	g, err := st.Game(ctx, gid)
+	if err != nil || g.Actions[0].Review == nil || g.Actions[1].Review == nil {
+		t.Fatalf("reviews: %v %+v", err, g)
+	}
+	curve, err := st.CurveByGame(ctx, gid)
+	if err != nil || len(curve[0]) != 2 || curve[0][1].WinRate != 0.4 {
+		t.Fatalf("curve: %v %+v", err, curve)
 	}
 }
 
@@ -145,6 +191,10 @@ func TestRoomsAdminSettingsHintsCurves(t *testing.T) {
 	hints, err := st.HintsByGame(ctx, gid)
 	if err != nil || len(hints) != 1 || hints[0].Seq != 3 || hints[0].Analysis != `{"winRate":0.6}` {
 		t.Fatalf("hints: %v %+v", err, hints)
+	}
+	allHints, err := st.ReplayHints(ctx, gid)
+	if err != nil || len(allHints) != 2 || allHints[1] != `{"winRate":0.4}` {
+		t.Fatalf("historical hints: %v %+v", err, allHints)
 	}
 
 	if err := st.AddCurvePoint(ctx, gid, 0, 4, 0.5, 0.7); err != nil {

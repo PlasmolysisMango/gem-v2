@@ -101,16 +101,17 @@ export function shortfall(p: PlayerView, c: Card): number[] {
 }
 
 /** Shortfall summary: per-color gap, gold that can cover it, and what is still missing afterwards. */
-export function gapOf(p: PlayerView, c: Card): { gap: number[]; gold: number; missing: number } {
+export function gapOf(p: PlayerView, c: Card): { gap: number[]; gold: number; missing: number; pay: Gems | null } {
   const gap = shortfall(p, c)
   const need = total(gap)
   const gold = Math.min(need, p.tokens[5])
-  return { gap, gold, missing: need - gold }
+  return { gap, gold, missing: need - gold, pay: autoPay(p, c) }
 }
 
 /** Human-readable gap, e.g. "还缺 蓝2 黑1，可用金 1 抵扣，仍差 2 枚". */
 export function gapText(p: PlayerView, c: Card): string {
-  const { gap, gold, missing } = gapOf(p, c)
+  const { gap, gold, missing, pay } = gapOf(p, c)
+  if (pay) return total(pay) === 0 ? '可免费购买' : `最佳支付（优先保留黄金）：${gemsText(pay)}，共 ${total(pay)} 枚`
   const parts = GEM_COLORS.flatMap((col, i) => (gap[i] ? [`${COLOR_NAME[col]}${gap[i]}`] : []))
   if (parts.length === 0) return '宝石已足够，无需黄金'
   const base = `还缺 ${parts.join(' ')}`

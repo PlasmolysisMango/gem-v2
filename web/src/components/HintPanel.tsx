@@ -39,6 +39,7 @@ export function HintPanel({
   focus,
   lastReview,
   seatName = (s) => `玩家${s + 1}`,
+  replay = false,
 }: {
   enabled: boolean
   myTurn: boolean
@@ -49,6 +50,7 @@ export function HintPanel({
   focus: number
   lastReview: MoveReview | null
   seatName?: (seat: number) => string
+  replay?: boolean
 }) {
   if (!enabled) {
     return <div className="text-sm text-slate-400">本房间未开启提示（房主可在创建房间时开启）。</div>
@@ -56,14 +58,15 @@ export function HintPanel({
   return (
     <div className="min-w-0 space-y-3 break-words">
       <div className="flex flex-wrap items-center gap-2">
-        <button
+        {!replay && <button
           className="min-h-[44px] min-w-[44px] px-3 py-1.5 rounded bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-40 font-semibold"
           disabled={!myTurn || loading}
           onClick={onRequest}
         >
           {loading ? '大师 AI 演算中…' : '提示'}
-        </button>
-        <span className="text-xs text-slate-400">由大师 AI（ISMCTS）在你的视角下实时演算</span>
+        </button>}
+        <span className="text-xs text-slate-400">{replay ? '大师 AI 按行动前的玩家视角分析，不读取未来牌序或对手暗牌。' : '由大师 AI（ISMCTS）在你的视角下实时演算'}</span>
+        {replay && loading && <span className="text-xs text-fuchsia-300">本手分析生成中…</span>}
       </div>
       {lastReview && (
         <div>

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { api, type Replay as ReplayData } from '../api/http'
 import type { CurvePoint, MoveReview, RoomState } from '../api/types'
 import { GameBoard } from '../components/GameBoard'
-import { ReviewBadge } from '../components/HintPanel'
+import { HintPanel, ReviewBadge } from '../components/HintPanel'
 import { PlayerPanel, ReviewSummary, WinCurve } from '../components/Panels'
 import { LANDSCAPE_QUERY, frameMoveEvents, frameMoves } from '../lib/gems'
 import { LEVEL_NAME } from './Lobby'
@@ -14,17 +14,47 @@ export default function Replay() {
   const [error, setError] = useState('')
   const [idx, setIdx] = useState(0)
   const [playing, setPlaying] = useState(false)
-  const [panel, setPanel] = useState<'review' | 'log'>('log')
+  const [panel, setPanel] = useState<'review' | 'log'>('review')
+  const [analysisError, setAnalysisError] = useState('')
+  const [retry, setRetry] = useState(0)
+  const [focus, setFocus] = useState(-1)
 
   useEffect(() => {
-    api
-      .game(Number(id))
-      .then((d) => {
-        setData(d)
-        setIdx(0)
-      })
-      .catch((e) => setError(e.message))
+    setData(null)
+    setIdx(0)
+    setError('')
+    setPlaying(false)
   }, [id])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    setAnalysisError('')
+    const generate = async () => {
+      let loaded: ReplayData
+      try {
+        loaded = await api.game(Number(id), controller.signal)
+        if (controller.signal.aborted) return
+        setData(loaded)
+      } catch (e) {
+        if (!controller.signal.aborted) setError((e as Error).message)
+        return
+      }
+      try {
+        for (const frame of loaded.frames) {
+          if (!frame.main || (frame.analysis && frame.review)) continue
+          const analyzed = await api.replayAnalysis(Number(id), frame.seq, controller.signal)
+          if (controller.signal.aborted) return
+          setData((d) => d ? { ...d, frames: d.frames.map((f) => f.seq === analyzed.seq ? analyzed : f) } : d)
+        }
+      } catch (e) {
+        if (!controller.signal.aborted) setAnalysisError((e as Error).message)
+      }
+    }
+    void generate()
+    return () => controller.abort()
+  }, [id, retry])
+
+  useEffect(() => setFocus(-1), [idx])
 
   const n = data?.frames.length ?? 0
   useEffect(() => {
@@ -66,7 +96,7 @@ export default function Replay() {
     data?.frames.forEach((f) => {
       if (!f.review) return
       const arr = m.get(f.seat) ?? []
-      arr.push({ turn: f.view.turn, winRate: f.review.playedWinRate, best: f.review.bestWinRate })
+      arr.push({ turn: f.turn, winRate: f.review.playedWinRate, best: f.review.bestWinRate })
       m.set(f.seat, arr)
     })
     return m
@@ -76,7 +106,12 @@ export default function Replay() {
   if (!data || !room) return <div className="text-slate-400 text-center mt-20">加载中…</div>
 
   const frame = idx > 0 ? data.frames[idx - 1] : null
-  const view = frame ? frame.view : data.initial
+  const position = frame ? frame.view : data.initial
+  const next = data.frames[idx]
+  const hint = next?.main ? next.analysis ?? null : null
+  const view = { ...position, viewer: next?.seat ?? frame?.seat ?? position.current }
+  const analysisTotal = data.frames.filter((f) => f.main).length
+  const analysisDone = data.frames.filter((f) => f.main && f.analysis && f.review).length
   const label = (s: number) => room.seats[s]?.name ?? `玩家${s + 1}`
   const moves = frameMoves(data.frames.slice(0, idx))
   const moveEvents = frameMoveEvents(data.frames.slice(0, idx))
@@ -149,7 +184,7 @@ export default function Replay() {
             )}
           </div>
           <div className="min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto">
-            <GameBoard view={view} room={room} moves={moves} moveHistory={moveEvents} />
+            <GameBoard view={view} room={room} moves={moves} moveHistory={moveEvents} hintAction={hint?.candidates[focus]?.action} />
           </div>
         </section>
         <aside className="min-w-0 flex flex-col gap-2 xl:min-h-0 xl:gap-3">
@@ -171,10 +206,22 @@ export default function Replay() {
               </button>
             ))}
           </nav>
-          <div id="replay-review" className={`min-w-0 xl:max-h-[45%] xl:overflow-y-auto ${panel === 'review' ? '' : 'hidden xl:block'}`}>
+          <div id="replay-review" className={`min-w-0 space-y-2 xl:max-h-[65%] xl:overflow-y-auto ${panel === 'review' ? '' : 'hidden xl:block'}`}>
+            <div className="card space-y-2">
+              <div role="status" className="text-xs text-slate-400">
+                {analysisError ? `分析暂停：${analysisDone}/${analysisTotal}，已完成的分析已保存。` : analysisDone < analysisTotal ? `大师 AI 逐手补算中：${analysisDone}/${analysisTotal}，可先浏览；离开后进度保留。` : `大师 AI 分析已完成：${analysisDone}/${analysisTotal}`}
+              </div>
+              {analysisError && <div className="text-xs text-rose-400">{analysisError} <button className="btn" onClick={() => setRetry((r) => r + 1)}>重试分析</button></div>}
+              <h3 className="font-semibold">{next ? `${label(next.seat)} · 行动前 AI 提示` : '已到对局末尾'}</h3>
+              {next?.main ? <HintPanel
+                replay enabled myTurn={false} loading={!hint && !analysisError} hint={hint}
+                onRequest={() => {}} onFocus={setFocus} focus={focus} lastReview={null} seatName={label}
+              /> : next ? <div className="text-xs text-slate-400">归还宝石或选择贵族阶段；主行动提示在前一手局面查看。</div> : null}
+            </div>
             {reviews.length > 0 ? (
               <div className="card space-y-2">
                 <h3 className="font-semibold">走后复盘（大师 AI 评估）</h3>
+                <p className="text-xs text-slate-400">胜率为 AI 估计值，用于比较着法，并非真实胜率。</p>
                 {[...curveBySeat.entries()].map(([seat, curve]) => (
                   <div key={seat} className="space-y-1">
                     <div className="text-sm">{label(seat)}</div>

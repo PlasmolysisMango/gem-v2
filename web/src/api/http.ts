@@ -20,7 +20,7 @@ export function setUnauthorizedHandler(f: () => void) {
   onUnauthorized = f
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   const res = await fetch(appUrl(path), {
@@ -28,6 +28,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
     credentials: 'same-origin',
+    signal,
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -49,6 +50,9 @@ export interface Frame {
   view: View
   events?: MoveEvent[]
   review?: import('./types').MoveReview
+  analysis?: import('./types').Analysis
+  turn: number
+  main: boolean
 }
 
 export interface Replay extends GameRecord {
@@ -69,7 +73,8 @@ export const api = {
   me: () => request<AuthUser>('GET', '/api/me'),
   rooms: () => request<RoomSummary[]>('GET', '/api/rooms'),
   createRoom: (s: RoomSettings) => request<RoomSummary>('POST', '/api/rooms', s),
-  game: (id: number) => request<Replay>('GET', `/api/games/${id}`),
+  game: (id: number, signal?: AbortSignal) => request<Replay>('GET', `/api/games/${id}`, undefined, signal),
+  replayAnalysis: (id: number, seq: number, signal?: AbortSignal) => request<Frame>('POST', `/api/games/${id}/analysis/${seq}`, undefined, signal),
   stats: (userId: number) => request<Stats>('GET', `/api/users/${userId}/stats`),
   adminSettings: () => request<AdminSettings>('GET', '/api/admin/settings'),
   setAdminSettings: (s: AdminSettings) => request<AdminSettings>('PUT', '/api/admin/settings', s),

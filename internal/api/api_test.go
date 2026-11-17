@@ -14,6 +14,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
+	"gem/internal/ai"
 	"gem/internal/auth"
 	"gem/internal/engine"
 	"gem/internal/game"
@@ -98,6 +99,92 @@ func TestAuthEndpoints(t *testing.T) {
 	}
 	if c := doJSON(t, "GET", srv.URL+"/api/rooms", "", nil, nil); c != 401 {
 		t.Fatalf("rooms without token should be 401, got %d", c)
+	}
+}
+
+func TestReplayAnalysisWithoutLiveHints(t *testing.T) {
+	srv, _, st := newTestServer(t)
+	var login AuthResponse
+	doJSON(t, "POST", srv.URL+"/api/auth/register", "", credentials{"reviewer", "secret1"}, &login)
+	ctx := context.Background()
+	const seed = 33
+	gid, err := st.CreateGame(ctx, "REPLAY", seed, []store.GamePlayer{{Seat: 0, UserID: &login.User.ID}, {Seat: 1, AILevel: "medium"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	url := fmt.Sprintf("%s/api/games/%d", srv.URL, gid)
+	if code := doJSON(t, "GET", url, login.Token, nil, nil); code != 409 {
+		t.Fatalf("ongoing replay: %d", code)
+	}
+	if code := doJSON(t, "POST", url+"/analysis/0", login.Token, nil, nil); code != 409 {
+		t.Fatalf("ongoing analysis: %d", code)
+	}
+	state, _ := engine.NewGame(2, seed)
+	bot := ai.NewMedium()
+	for seq := 0; !state.Over() && seq < 500; seq++ {
+		seat := int(state.Current)
+		masked := state.MaskFor(seat)
+		a, _ := bot.Choose(ctx, &masked, seat)
+		b, _ := json.Marshal(a)
+		if err := st.AddAction(ctx, gid, seq, seat, string(b)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := state.Apply(a); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !state.Over() {
+		t.Fatal("fixture game did not finish")
+	}
+	if err := st.FinishGame(ctx, gid, "finished", []int{int(state.Players[0].Points), int(state.Players[1].Points)}, nil); err != nil {
+		t.Fatal(err)
+	}
+	var before Replay
+	if code := doJSON(t, "GET", url, login.Token, nil, &before); code != 200 {
+		t.Fatalf("replay: %d", code)
+	}
+	mainCount := 0
+	for _, frame := range before.Frames {
+		if frame.Review != nil || frame.Analysis != nil {
+			t.Fatal("unhinted game already has analysis")
+		}
+		if !frame.Main {
+			if code := doJSON(t, "POST", fmt.Sprintf("%s/analysis/%d", url, frame.Seq), login.Token, nil, nil); code != 400 {
+				t.Fatalf("subphase analysis: %d", code)
+			}
+			continue
+		}
+		mainCount++
+		var analyzed Frame
+		if code := doJSON(t, "POST", fmt.Sprintf("%s/analysis/%d", url, frame.Seq), login.Token, nil, &analyzed); code != 200 {
+			t.Fatalf("analyze seq %d: %d", frame.Seq, code)
+		}
+		if analyzed.Analysis == nil || analyzed.Analysis.Level != ai.Master || analyzed.Review == nil || analyzed.Analysis.Seat != frame.Seat || analyzed.Turn != frame.Turn {
+			t.Fatalf("incomplete analysis: %+v", analyzed)
+		}
+		if mainCount == 1 {
+			var cached Frame
+			doJSON(t, "POST", fmt.Sprintf("%s/analysis/%d", url, frame.Seq), login.Token, nil, &cached)
+			x, _ := json.Marshal(analyzed)
+			y, _ := json.Marshal(cached)
+			if string(x) != string(y) {
+				t.Fatal("cached analysis was recalculated")
+			}
+		}
+	}
+	var after Replay
+	doJSON(t, "GET", url, login.Token, nil, &after)
+	for _, frame := range after.Frames {
+		if frame.Main && (frame.Analysis == nil || frame.Review == nil) {
+			t.Fatalf("analysis not persisted for seq %d", frame.Seq)
+		}
+	}
+	curves, err := st.CurveByGame(ctx, gid)
+	if err != nil || len(curves) != 2 || len(curves[0])+len(curves[1]) != mainCount {
+		t.Fatalf("curves: %v %+v", err, curves)
+	}
+	if code := doJSON(t, "POST", url+"/analysis/999999", login.Token, nil, nil); code != 400 {
+		t.Fatalf("invalid seq: %d", code)
 	}
 }
 

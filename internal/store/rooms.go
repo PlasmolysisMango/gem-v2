@@ -121,21 +121,10 @@ type HintRow struct {
 	Analysis string // JSON-encoded ai.Analysis
 }
 
-// SetHint stores the latest hint for a seat, replacing older turns.
 func (s *Store) SetHint(ctx context.Context, gameID int64, seat, seq int, analysisJSON string) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM game_hints WHERE game_id = ? AND seat = ?`, gameID, seat); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO game_hints (game_id, seat, seq, analysis_json) VALUES (?, ?, ?, ?)`,
-		gameID, seat, seq, analysisJSON); err != nil {
-		return err
-	}
-	return tx.Commit()
+	_, err := s.db.ExecContext(ctx, `INSERT INTO game_hints (game_id, seat, seq, analysis_json) VALUES (?, ?, ?, ?)
+		ON CONFLICT(game_id, seat, seq) DO UPDATE SET analysis_json = excluded.analysis_json`, gameID, seat, seq, analysisJSON)
+	return err
 }
 
 // HintsByGame returns the latest hint of every seat.
@@ -157,6 +146,44 @@ func (s *Store) HintsByGame(ctx context.Context, gameID int64) (map[int]HintRow,
 		out[seat] = h
 	}
 	return out, rows.Err()
+}
+
+func (s *Store) ReplayHints(ctx context.Context, gameID int64) (map[int]string, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT seq, analysis_json FROM game_hints WHERE game_id = ?`, gameID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int]string{}
+	for rows.Next() {
+		var seq int
+		var analysis string
+		if err := rows.Scan(&seq, &analysis); err != nil {
+			return nil, err
+		}
+		out[seq] = analysis
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) SaveReplayAnalysis(ctx context.Context, gameID int64, seat, seq, turn int, analysis, review string, playedWin, bestWin float64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `INSERT INTO game_hints (game_id, seat, seq, analysis_json) VALUES (?, ?, ?, ?)
+		ON CONFLICT(game_id, seat, seq) DO UPDATE SET analysis_json = excluded.analysis_json`, gameID, seat, seq, analysis); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE game_actions SET review_json = ? WHERE game_id = ? AND seq = ?`, review, gameID, seq); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO game_curves (game_id, seat, turn, played_win, best_win) VALUES (?, ?, ?, ?, ?)
+		ON CONFLICT(game_id, seat, turn) DO UPDATE SET played_win = excluded.played_win, best_win = excluded.best_win`, gameID, seat, turn, playedWin, bestWin); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // CurvePoint is one win-rate sample of a player after their own move.

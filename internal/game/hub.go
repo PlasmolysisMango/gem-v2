@@ -91,6 +91,8 @@ func NewHub(st *store.Store, cfg Config) *Hub {
 	return &Hub{cfg: cfg, store: st, rooms: map[string]*Room{}}
 }
 
+func (h *Hub) HintBudget() time.Duration { return h.cfg.HintBudget }
+
 var ErrSettings = errors.New("房间设置无效：座位数 2-4，AI 难度为 easy/medium/hard")
 
 // Create opens a room owned by the user; seat 0 is reserved for the owner and the

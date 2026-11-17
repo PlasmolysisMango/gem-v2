@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"gem/internal/ai"
@@ -20,10 +21,11 @@ import (
 
 // Server wires handlers together.
 type Server struct {
-	Auth   *auth.Service
-	Store  *store.Store
-	Hub    *game.Hub
-	Static fs.FS // optional built web client (index.html at root)
+	Auth     *auth.Service
+	Store    *store.Store
+	Hub      *game.Hub
+	Static   fs.FS // optional built web client (index.html at root)
+	replayMu sync.Mutex
 }
 
 // Handler returns the HTTP handler with all routes.
@@ -38,6 +40,7 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /api/rooms", protected(s.listRooms))
 	mux.Handle("POST /api/rooms", protected(s.createRoom))
 	mux.Handle("GET /api/games/{id}", protected(s.gameRecord))
+	mux.Handle("POST /api/games/{id}/analysis/{seq}", protected(s.replayAnalysis))
 	mux.Handle("GET /api/users/{id}/stats", protected(s.stats))
 	mux.Handle("GET /api/admin/settings", s.adminOnly(s.adminGetSettings))
 	mux.Handle("PUT /api/admin/settings", s.adminOnly(s.adminPutSettings))
@@ -184,17 +187,131 @@ func (s *Server) gameRecord(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 409, "对局仍在进行，结束后才能复盘")
 		return
 	}
-	writeJSON(w, 200, buildReplay(g))
+	rp, err := s.loadReplay(r.Context(), g)
+	if err != nil {
+		writeErr(w, 500, "读取复盘分析失败")
+		return
+	}
+	writeJSON(w, 200, rp)
+}
+
+func (s *Server) loadReplay(ctx context.Context, g store.Game) (Replay, error) {
+	rp := buildReplay(g)
+	hints, err := s.Store.ReplayHints(ctx, g.ID)
+	if err != nil {
+		return rp, err
+	}
+	for i := range rp.Frames {
+		f := &rp.Frames[i]
+		var an ai.Analysis
+		if json.Unmarshal([]byte(hints[f.Seq]), &an) == nil && an.Level == ai.Master && an.Seat == f.Seat && len(an.Candidates) > 0 {
+			f.Analysis = &an
+		}
+	}
+	return rp, nil
+}
+
+func (s *Server) replayAnalysis(w http.ResponseWriter, r *http.Request) {
+	gid, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	seq, seqErr := strconv.Atoi(r.PathValue("seq"))
+	if err != nil || seqErr != nil || seq < 0 {
+		writeErr(w, 400, "对局或着法 ID 无效")
+		return
+	}
+	s.replayMu.Lock()
+	defer s.replayMu.Unlock()
+	if r.Context().Err() != nil {
+		return
+	}
+	g, err := s.Store.Game(r.Context(), gid)
+	if errors.Is(err, store.ErrNotFound) {
+		writeErr(w, 404, "对局不存在")
+		return
+	}
+	if err != nil {
+		writeErr(w, 500, "读取对局失败")
+		return
+	}
+	if g.Status == "playing" {
+		writeErr(w, 409, "对局仍在进行，结束后才能复盘")
+		return
+	}
+	rp, err := s.loadReplay(r.Context(), g)
+	if err != nil {
+		writeErr(w, 500, "读取复盘分析失败")
+		return
+	}
+	var frame *Frame
+	for i := range rp.Frames {
+		if rp.Frames[i].Seq == seq && rp.Frames[i].Main {
+			frame = &rp.Frames[i]
+			break
+		}
+	}
+	if frame == nil {
+		writeErr(w, 400, "该着法不是可分析的主行动")
+		return
+	}
+	if frame.Analysis != nil && frame.Review != nil {
+		writeJSON(w, 200, frame)
+		return
+	}
+	state, err := engine.NewGame(g.PlayerCount, g.Seed)
+	if err != nil {
+		writeErr(w, 500, "重建对局失败")
+		return
+	}
+	for _, ra := range g.Actions {
+		var action engine.Action
+		if json.Unmarshal([]byte(ra.Action), &action) != nil {
+			writeErr(w, 500, "重建着法失败")
+			return
+		}
+		if ra.Seq != seq {
+			if _, err := state.Apply(action); err != nil {
+				writeErr(w, 500, "重建局面失败")
+				return
+			}
+			continue
+		}
+		// Never let the coach see future deck order or opponents' hidden reserves.
+		masked := state.MaskFor(ra.Seat)
+		coach := ai.NewMaster(s.Hub.HintBudget())
+		an := frame.Analysis
+		if an == nil {
+			an = coach.Analyze(r.Context(), &masked, ra.Seat, true)
+		}
+		if r.Context().Err() != nil {
+			return
+		}
+		if an == nil || len(an.Candidates) == 0 {
+			writeErr(w, 500, "AI 分析失败，请重试")
+			return
+		}
+		review := coach.Review(&masked, ra.Seat, an, action)
+		ab, _ := json.Marshal(an)
+		rb, _ := json.Marshal(review)
+		if err := s.Store.SaveReplayAnalysis(r.Context(), gid, ra.Seat, seq, frame.Turn, string(ab), string(rb), review.PlayedWinRate, review.BestWinRate); err != nil {
+			writeErr(w, 500, "保存复盘分析失败")
+			return
+		}
+		frame.Analysis, frame.Review = an, &review
+		writeJSON(w, 200, frame)
+		return
+	}
 }
 
 // Frame is the position after one recorded move.
 type Frame struct {
-	Seq    int            `json:"seq"`
-	Seat   int            `json:"seat"`
-	Text   string         `json:"text"`
-	View   engine.View    `json:"view"`
-	Events []engine.Event `json:"events,omitempty"`
-	Review *ai.MoveReview `json:"review,omitempty"`
+	Seq      int            `json:"seq"`
+	Seat     int            `json:"seat"`
+	Text     string         `json:"text"`
+	View     engine.View    `json:"view"`
+	Events   []engine.Event `json:"events,omitempty"`
+	Review   *ai.MoveReview `json:"review,omitempty"`
+	Analysis *ai.Analysis   `json:"analysis,omitempty"`
+	Turn     int            `json:"turn"`
+	Main     bool           `json:"main"`
 }
 
 // Replay is a finished game with every intermediate position.
@@ -216,11 +333,12 @@ func buildReplay(g store.Game) Replay {
 		if json.Unmarshal([]byte(ra.Action), &a) != nil {
 			break
 		}
+		turn, main := int(s.Turn), s.Phase == engine.PhaseMain
 		events, err := s.Apply(a)
 		if err != nil {
 			break
 		}
-		f := Frame{Seq: ra.Seq, Seat: ra.Seat, Text: engine.Describe(a), View: s.ViewFor(-1), Events: events}
+		f := Frame{Seq: ra.Seq, Seat: ra.Seat, Text: engine.Describe(a), View: s.ViewFor(-1), Events: events, Turn: turn, Main: main}
 		if ra.Review != nil {
 			var mr ai.MoveReview
 			if json.Unmarshal([]byte(*ra.Review), &mr) == nil {

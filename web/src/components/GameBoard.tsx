@@ -90,7 +90,7 @@ function HelpTip() {
           role="tooltip"
           className="absolute top-full right-0 z-20 mt-1 w-60 rounded-lg border border-slate-600 bg-slate-800 p-2 text-xs leading-5 text-slate-200 shadow-lg"
         >
-          轮到你时：点击银行筹码拿取，或点击卡牌购买/预留，点击牌堆盲扣。「显示缺口」会在卡牌上标出还缺几个什么颜色的宝石。
+          轮到你时：点击银行筹码拿取，或点击卡牌购买/预留，点击牌堆盲扣。「显示缺口」会标出缺少的宝石；可买的卡牌显示最佳支付数量，优先保留黄金。
         </span>
       )}
     </span>

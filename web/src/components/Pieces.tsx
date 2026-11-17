@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../api/http'
 import type { Card, Color, Gems, MoveEvent, Noble } from '../api/types'
 import { ALL_COLORS, GEM_COLORS } from '../api/types'
-import { COLOR_NAME } from '../lib/gems'
+import { COLOR_NAME, gemsText, total } from '../lib/gems'
 
 export const GEM_BG: Record<Color, string> = {
   white: 'bg-gem-white text-slate-900',
@@ -95,7 +95,7 @@ export function CostDots({ cost, small, fluid, gap }: { cost: number[]; small?: 
   const grid = small || cost.filter((n) => n > 0).length >= 4
   return (
     <div className={grid ? 'cost-dots grid grid-cols-2 gap-0.5' : 'cost-dots flex flex-col-reverse gap-0.5 items-start'}>
-      {GEM_COLORS.map((c, i) =>
+      {ALL_COLORS.map((c, i) =>
         cost[i] > 0 ? (
           <span key={c} className={`flex items-center ${grid ? 'gap-px' : 'gap-0.5'}`}>
             <span
@@ -119,16 +119,12 @@ export function CostDots({ cost, small, fluid, gap }: { cost: number[]; small?: 
   )
 }
 
-export type CardGap = { gap: number[]; gold: number; missing: number }
+export type CardGap = { gap: number[]; gold: number; missing: number; pay: Gems | null }
 
 function GapBadge({ g }: { g: CardGap }) {
-  const need = g.gap.reduce((a, b) => a + b, 0)
-  const [text, tone, title] =
-    need === 0
-      ? ['可买', 'bg-emerald-600 text-white', '宝石已足够']
-      : g.missing === 0
-        ? [`金${g.gold}`, 'bg-gem-gold text-slate-900', `用 ${g.gold} 枚黄金补足即可购买`]
-        : [`差${g.missing}`, 'bg-rose-600 text-white', g.gold > 0 ? `黄金抵扣 ${g.gold} 枚后仍差 ${g.missing} 枚` : `还差 ${g.missing} 枚`]
+  const [text, tone, title] = g.pay
+    ? [total(g.pay) === 0 ? '免费' : `付${total(g.pay)}`, 'bg-emerald-600 text-white', `最佳支付（优先保留黄金）：${gemsText(g.pay)}`]
+    : [`差${g.missing}`, 'bg-rose-600 text-white', g.gold > 0 ? `黄金抵扣 ${g.gold} 枚后仍差 ${g.missing} 枚` : `还差 ${g.missing} 枚`]
   return (
     <span className={`rounded px-1 text-[10px] font-bold leading-4 ring-1 ring-black/40 ${tone}`} title={title}>
       {text}
@@ -191,7 +187,7 @@ export function CardTile({
         </span>
       )}
       <div className="absolute bottom-1 left-1">
-        <CostDots cost={card.cost} small={small} fluid={fluid} gap={gap?.gap} />
+        <CostDots cost={gap?.pay ?? card.cost} small={small} fluid={fluid} gap={gap?.pay ? undefined : gap?.gap} />
       </div>
       {!gap && <span className="absolute bottom-0.5 right-1 text-[10px] opacity-70">L{card.level}</span>}
     </button>

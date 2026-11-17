@@ -117,10 +117,12 @@ describe('payment', () => {
   })
 
   it('reports the per-color gap and whether gold covers it', () => {
-    expect(gapOf(player([1, 0, 0, 0, 0, 1]), card)).toEqual({ gap: [1, 1, 0, 0, 0], gold: 1, missing: 1 })
+    expect(gapOf(player([1, 0, 0, 0, 0, 1]), card)).toEqual({ gap: [1, 1, 0, 0, 0], gold: 1, missing: 1, pay: null })
     expect(gapText(player([1, 0, 0, 0, 0, 1]), card)).toBe('还缺 白1 蓝1，黄金抵扣 1 枚后仍差 1 枚')
-    expect(gapText(player([1, 1, 0, 0, 0, 1]), card)).toBe('还缺 白1，可用 1 枚黄金补足')
-    expect(gapText(player([0, 0, 0, 0, 0, 0], [2, 1, 0, 0, 0]), card)).toBe('宝石已足够，无需黄金')
+    expect(gapOf(player([1, 1, 0, 0, 0, 1]), card).pay).toEqual([1, 1, 0, 0, 0, 1])
+    expect(gapText(player([1, 1, 0, 0, 0, 1]), card)).toBe('最佳支付（优先保留黄金）：白1 蓝1 金1，共 3 枚')
+    expect(gapText(player([2, 1, 0, 0, 0, 2]), card)).toBe('最佳支付（优先保留黄金）：白2 蓝1，共 3 枚')
+    expect(gapText(player([0, 0, 0, 0, 0, 0], [2, 1, 0, 0, 0]), card)).toBe('可免费购买')
   })
 })
 

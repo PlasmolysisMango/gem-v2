@@ -8,7 +8,7 @@ import * as gameStore from '../store/game'
 import type { Action, Analysis, Card, GameOver, MoveEvent, RoomState, View } from '../api/types'
 import { GameBoard } from './GameBoard'
 import { HintPanel } from './HintPanel'
-import { ChatDialog, GameOverModal, LogDialog, PlayerPanel } from './Panels'
+import { ChatDialog, GameOverModal, LogDialog, PlayerPanel, WinCurve } from './Panels'
 import { CardTile, GemToken, MoveIcons, TokenRow } from './Pieces'
 
 const action = (values: Partial<Action>): Action => ({
@@ -130,12 +130,32 @@ describe('手机端组件结构', () => {
   })
 
   it('缺口标记显示每色差额与黄金补足情况', () => {
-    const html = renderToStaticMarkup(<CardTile card={card(1)} fluid gap={{ gap: [1, 0, 0, 1, 0], gold: 1, missing: 1 }} />)
+    const html = renderToStaticMarkup(<CardTile card={card(1)} fluid gap={{ gap: [1, 0, 0, 1, 0], gold: 1, missing: 1, pay: null }} />)
     expect(html).toContain('还缺白 1')
     expect(html).toContain('还缺红 1')
     expect(html).toContain('差1')
-    const ok = renderToStaticMarkup(<CardTile card={card(1)} fluid gap={{ gap: [0, 0, 0, 1, 0], gold: 1, missing: 0 }} />)
-    expect(ok).toContain('金1')
+    const ok = renderToStaticMarkup(<CardTile card={card(1)} fluid gap={{ gap: [0, 0, 0, 1, 0], gold: 1, missing: 0, pay: [1, 0, 1, 0, 1, 1] }} />)
+    expect(ok).toContain('付4')
+    expect(ok).toContain('最佳支付（优先保留黄金）：白1 绿1 黑1 金1')
+    expect(ok).toContain('aria-label="金 1"')
+    expect(ok).not.toContain('还缺红')
+    const free = renderToStaticMarkup(<CardTile card={card(1)} gap={{ gap: [0, 0, 0, 0, 0], gold: 0, missing: 0, pay: [0, 0, 0, 0, 0, 0] }} />)
+    expect(free).toContain('免费')
+  })
+
+  it('胜率曲线提供百分比刻度、实际回合编号和可聚焦的百分比数据点', () => {
+    const html = renderToStaticMarkup(<WinCurve curve={[{ turn: 2, winRate: 0.25, best: 0.5 }, { turn: 8, winRate: 0.75, best: 0.8 }]} />)
+    expect(html).toContain('100%')
+    expect(html).toContain('50%')
+    expect(html).toContain('0%')
+    expect(html).toContain('第 3 回合：实际 25.0%，最佳 50.0%')
+    expect(html).toContain('第 9 回合：实际 75.0%，最佳 80.0%')
+    expect(html.match(/tabindex="0"/g)).toHaveLength(2)
+    expect(html).toContain('role="status"')
+    const single = renderToStaticMarkup(<WinCurve curve={[{ turn: 5, winRate: 0.3, best: 0.4 }]} />)
+    expect(single).toContain('30.0%')
+    expect(single).not.toContain('NaN')
+    expect(renderToStaticMarkup(<WinCurve curve={[]} />)).toContain('暂无胜率数据')
   })
 
   it('棋盘保留所有明牌和牌堆，银行下方统一两列玩家栏，横屏我方预留仍常驻', () => {

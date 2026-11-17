@@ -236,30 +236,64 @@ export function ChatDialog({ chat, onSend, onClose }: { chat: ChatMessage[]; onS
 }
 
 export function WinCurve({ curve }: { curve: CurvePoint[] }) {
-  if (curve.length < 2) return <div className="text-xs text-slate-500">样本不足，无法绘制胜率曲线</div>
+  const [hover, setHover] = useState<number | null>(null)
+  if (curve.length === 0) return <div className="text-xs text-slate-500">暂无胜率数据</div>
   const w = 420
-  const h = 140
-  const x = (i: number) => 20 + (i / (curve.length - 1)) * (w - 30)
-  const y = (v: number) => 10 + (1 - v) * (h - 20)
+  const h = 160
+  const first = curve[0].turn
+  const last = curve[curve.length - 1].turn
+  const x = (i: number) => first === last ? 225 : 40 + ((curve[i].turn - first) / (last - first)) * 365
+  const y = (v: number) => 22 + (1 - v) * 112
+  const active = Math.min(hover ?? curve.length - 1, curve.length - 1)
+  const point = curve[active]
   const line = (k: 'winRate' | 'best') => curve.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join(' ')
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto bg-slate-950/60 rounded">
-      <line x1={20} x2={w - 10} y1={y(0.5)} y2={y(0.5)} stroke="#475569" strokeDasharray="4 4" />
-      <path d={line('best')} fill="none" stroke="#a78bfa" strokeWidth={1.5} strokeDasharray="3 2" />
-      <path d={line('winRate')} fill="none" stroke="#f0abfc" strokeWidth={2} />
-      {curve.map((p, i) => (
-        <circle
-          key={i}
-          cx={x(i)}
-          cy={y(p.winRate)}
-          r={2.5}
-          fill={p.best - p.winRate > 0.15 ? '#f43f5e' : p.best - p.winRate > 0.05 ? '#f59e0b' : '#f0abfc'}
-        />
-      ))}
-      <text x={22} y={12} fill="#94a3b8" fontSize={10}>
-        胜率（实线：你的着法；虚线：最佳着法）
-      </text>
-    </svg>
+    <div className="space-y-1">
+      <div className="text-[11px] text-slate-400">胜率（实线：实际着法；虚线：最佳着法）</div>
+      <svg
+        aria-label="胜率曲线，移动鼠标或聚焦数据点查看百分比"
+        viewBox={`0 0 ${w} ${h}`}
+        className="w-full h-auto bg-slate-950/60 rounded"
+        onPointerMove={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          const px = ((e.clientX - rect.left) / rect.width) * w
+          let nearest = 0
+          curve.forEach((_, i) => {
+            if (Math.abs(x(i) - px) < Math.abs(x(nearest) - px)) nearest = i
+          })
+          setHover(nearest)
+        }}
+        onPointerLeave={() => setHover(null)}
+      >
+        {[0, 0.5, 1].map((v) => (
+          <g key={v}>
+            <line x1={40} x2={405} y1={y(v)} y2={y(v)} stroke="#475569" strokeDasharray="4 4" />
+            <text x={35} y={y(v) + 4} textAnchor="end" fill="#94a3b8" fontSize={11}>{v * 100}%</text>
+          </g>
+        ))}
+        <path d={line('best')} fill="none" stroke="#a78bfa" strokeWidth={1.5} strokeDasharray="3 2" />
+        <path d={line('winRate')} fill="none" stroke="#f0abfc" strokeWidth={2} />
+        <line x1={x(active)} x2={x(active)} y1={22} y2={134} stroke="#cbd5e1" strokeDasharray="2 3" />
+        {curve.map((p, i) => (
+          <circle
+            key={p.turn}
+            tabIndex={0}
+            aria-label={`第 ${p.turn + 1} 回合：实际 ${pct(p.winRate)}，最佳 ${pct(p.best)}`}
+            onFocus={() => setHover(i)}
+            onBlur={() => setHover(null)}
+            cx={x(i)} cy={y(p.winRate)} r={i === active ? 4 : 2.5}
+            fill={p.best - p.winRate > 0.15 ? '#f43f5e' : p.best - p.winRate > 0.05 ? '#f59e0b' : '#f0abfc'}
+          >
+            <title>{`第 ${p.turn + 1} 回合：实际 ${pct(p.winRate)}，最佳 ${pct(p.best)}`}</title>
+          </circle>
+        ))}
+        <text x={40} y={153} fill="#94a3b8" fontSize={11}>第 {first + 1} 回合</text>
+        {last !== first && <text x={405} y={153} textAnchor="end" fill="#94a3b8" fontSize={11}>第 {last + 1} 回合</text>}
+      </svg>
+      <div role="status" className="text-xs text-fuchsia-200 font-mono">
+        第 {point.turn + 1} 回合 · 实际 {pct(point.winRate)} · 最佳 {pct(point.best)}
+      </div>
+    </div>
   )
 }
 
