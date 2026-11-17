@@ -13,6 +13,8 @@ Environment=GEM_ADDR=127.0.0.1:9096
 Environment=GEM_DB=/var/lib/gem-v2/gem.db
 # 静态资源由 nginx 发，Go 只提供 API/WS。
 Environment=GEM_STATIC=
+# 启动时提升为管理员的账号；清理时长默认 168h（7 天），可在管理页运行时修改。
+Environment=GEM_ADMIN_USER=mango
 EnvironmentFile=-/etc/gem-v2.env
 StateDirectory=gem-v2
 StateDirectoryMode=0700

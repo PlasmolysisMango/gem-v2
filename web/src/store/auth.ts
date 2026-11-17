@@ -4,12 +4,14 @@ import { setToken } from '../api/http'
 export interface AuthUser {
   id: number
   username: string
+  isAdmin?: boolean
 }
 
 interface AuthState {
   token: string | null
   user: AuthUser | null
   login: (token: string, user: AuthUser) => void
+  setUser: (user: AuthUser) => void
   logout: () => void
 }
 
@@ -29,12 +31,18 @@ function load(): { token: string | null; user: AuthUser | null } {
   return { token: null, user: null }
 }
 
-export const useAuth = create<AuthState>((set) => ({
+export const useAuth = create<AuthState>((set, get) => ({
   ...load(),
   login: (token, user) => {
     localStorage.setItem(KEY, JSON.stringify({ token, user }))
     setToken(token)
     set({ token, user })
+  },
+  setUser: (user) => {
+    const token = get().token
+    if (!token) return
+    localStorage.setItem(KEY, JSON.stringify({ token, user }))
+    set({ user })
   },
   logout: () => {
     localStorage.removeItem(KEY)

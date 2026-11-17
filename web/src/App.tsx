@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { setUnauthorizedHandler } from './api/http'
+import { api, setUnauthorizedHandler } from './api/http'
 import { useAuth } from './store/auth'
 import { useGame } from './store/game'
 import Login from './pages/Login'
@@ -8,6 +8,7 @@ import Lobby from './pages/Lobby'
 import Room from './pages/Room'
 import Replay from './pages/Replay'
 import Stats from './pages/Stats'
+import Admin from './pages/Admin'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = useAuth((s) => s.token)
@@ -17,6 +18,7 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 export default function App() {
   const { token, user, logout } = useAuth()
+  const setUser = useAuth((s) => s.setUser)
   const connect = useGame((s) => s.connect)
   const disconnect = useGame((s) => s.disconnect)
   const connected = useGame((s) => s.connected)
@@ -34,6 +36,19 @@ export default function App() {
     else disconnect()
   }, [token, connect, disconnect])
 
+  // Refresh the profile so role changes (and users cached by older clients) are picked up.
+  useEffect(() => {
+    if (!token) return
+    let alive = true
+    api
+      .me()
+      .then((u) => alive && setUser(u))
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [token, setUser])
+
   return (
     <div className="app-shell">
       <header className="shrink-0 flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 px-2 sm:px-4 py-1 sm:py-2 bg-slate-950/80 border-b border-slate-800">
@@ -48,6 +63,11 @@ export default function App() {
             <Link to={`/users/${user.id}`} className="inline-flex min-h-[44px] min-w-[44px] items-center text-sm hover:text-sky-300">
               战绩
             </Link>
+            {user.isAdmin && (
+              <Link to="/admin" className="inline-flex min-h-[44px] min-w-[44px] items-center text-sm text-amber-300 hover:text-amber-200">
+                管理
+              </Link>
+            )}
             <span className="ml-auto min-w-0 max-w-[5rem] sm:max-w-[10rem] truncate text-sm text-slate-400" title={user.username}>
               <span className={`inline-block w-2 h-2 rounded-full mr-1 ${connected ? 'bg-emerald-400' : 'bg-rose-500'}`} />
               {user.username}
@@ -96,6 +116,14 @@ export default function App() {
             element={
               <RequireAuth>
                 <Stats />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <RequireAuth>
+                <Admin />
               </RequireAuth>
             }
           />

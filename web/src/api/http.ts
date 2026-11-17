@@ -1,6 +1,6 @@
 import { appUrl } from '../base'
 import type { AuthUser } from '../store/auth'
-import type { Card, GameRecord, MoveEvent, Noble, RoomSettings, RoomSummary, Stats, User, View } from './types'
+import type { AdminSettings, Card, GameRecord, MoveEvent, Noble, RoomSettings, RoomSummary, Stats, User, View } from './types'
 
 export class ApiError extends Error {
   constructor(
@@ -71,4 +71,7 @@ export const api = {
   createRoom: (s: RoomSettings) => request<RoomSummary>('POST', '/api/rooms', s),
   game: (id: number) => request<Replay>('GET', `/api/games/${id}`),
   stats: (userId: number) => request<Stats>('GET', `/api/users/${userId}/stats`),
+  adminSettings: () => request<AdminSettings>('GET', '/api/admin/settings'),
+  setAdminSettings: (s: AdminSettings) => request<AdminSettings>('PUT', '/api/admin/settings', s),
+  closeRoom: (id: string) => request<void>('DELETE', `/api/admin/rooms/${encodeURIComponent(id)}`),
 }

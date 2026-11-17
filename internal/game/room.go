@@ -15,12 +15,10 @@ import (
 )
 
 type seat struct {
-	kind      string
-	userID    int64
-	name      string
-	level     ai.Level
-	bot       bool // a medium AI plays for a disconnected human
-	discTimer *time.Timer
+	kind   string
+	userID int64
+	name   string
+	level  ai.Level
 }
 
 func (s *seat) displayName() string {
@@ -46,6 +44,7 @@ type Room struct {
 	inbox   chan func()
 	ctx     context.Context
 	cancel  context.CancelFunc
+	done    chan struct{}
 	summary atomic.Pointer[RoomSummary]
 
 	name        string
@@ -72,17 +71,18 @@ type Room struct {
 	turnTimer *time.Timer
 	deadline  time.Time
 	idleTimer *time.Timer
+	createdAt time.Time
 	closed    bool
 }
 
 func newRoom(h *Hub, id, name string, ownerID int64, ownerName string, seats []seat, hints bool, turnSeconds int) *Room {
 	ctx, cancel := context.WithCancel(context.Background())
 	r := &Room{
-		id: id, hub: h, cfg: h.cfg, inbox: make(chan func(), 256), ctx: ctx, cancel: cancel,
+		id: id, hub: h, cfg: h.cfg, inbox: make(chan func(), 256), ctx: ctx, cancel: cancel, done: make(chan struct{}),
 		name: name, ownerID: ownerID, ownerName: ownerName, status: "waiting", seats: seats,
 		hints: hints, turnSeconds: turnSeconds, clients: map[*Session]int{}, aiPending: -1,
 		hintCache: map[int]hintEntry{}, hintBusy: map[int]int{},
-		reviews: map[int][]ai.MoveReview{}, curve: map[int][]CurvePoint{},
+		reviews: map[int][]ai.MoveReview{}, curve: map[int][]CurvePoint{}, createdAt: time.Now(),
 	}
 	r.hard = ai.NewHard(h.cfg.HintBudget)
 	r.bot = ai.NewMedium()
@@ -123,6 +123,7 @@ func (r *Room) post(f func()) {
 }
 
 func (r *Room) loop() {
+	defer close(r.done)
 	for {
 		select {
 		case f := <-r.inbox:
@@ -163,20 +164,10 @@ func (r *Room) join(s *Session) {
 			}
 		}
 	}
+	_, existed := r.clients[s]
 	r.clients[s] = idx
-	if idx >= 0 {
-		st := &r.seats[idx]
-		if st.discTimer != nil {
-			st.discTimer.Stop()
-			st.discTimer = nil
-		}
-		if st.bot {
-			st.bot = false
-			if r.aiPending == r.seq {
-				r.aiPending = -1 // result of the bot will be discarded; the human moves now
-			}
-			r.scheduleTurn()
-		}
+	if r.status == "waiting" && !existed && idx >= 0 {
+		r.persistRoom()
 	}
 	if r.idleTimer != nil {
 		r.idleTimer.Stop()
@@ -191,6 +182,9 @@ func (r *Room) join(s *Session) {
 		}
 		if r.status == "finished" {
 			s.Send(envelope(MsgGameOver, r.id, r.gameOver(idx)))
+		}
+		if r.status == "playing" {
+			r.scheduleTurn()
 		}
 	}
 }
@@ -210,30 +204,17 @@ func (r *Room) leave(s *Session, explicit bool) {
 		return
 	}
 	delete(r.clients, s)
-	if idx >= 0 && !r.seatConnected(idx) {
-		st := &r.seats[idx]
-		switch r.status {
-		case "waiting":
-			if explicit && st.userID != r.ownerID {
-				*st = seat{kind: SeatOpen}
-			} else if explicit {
-				r.transferOwner(idx)
-			}
-		case "playing":
-			if explicit {
-				r.takeOver(idx)
-			} else if st.discTimer == nil && !st.bot {
-				uid := st.userID
-				st.discTimer = time.AfterFunc(r.cfg.ReconnectGrace, func() {
-					r.post(func() {
-						if r.seats[idx].userID == uid && !r.seatConnected(idx) {
-							r.seats[idx].discTimer = nil
-							r.takeOver(idx)
-						}
-					})
-				})
-			}
+	// A disconnected human keeps their seat; the game waits for them to return.
+	if idx >= 0 && !r.seatConnected(idx) && r.status == "waiting" {
+		if explicit && r.seats[idx].userID != r.ownerID {
+			r.seats[idx] = seat{kind: SeatOpen}
+			r.persistRoom()
+		} else if explicit {
+			r.transferOwner(idx)
 		}
+	}
+	if r.status == "playing" {
+		r.scheduleTurn()
 	}
 	if len(r.clients) == 0 {
 		r.resetIdle()
@@ -249,26 +230,17 @@ func (r *Room) transferOwner(old int) {
 	for i := range r.seats {
 		if r.seats[i].kind == SeatHuman {
 			r.ownerID, r.ownerName = r.seats[i].userID, r.seats[i].name
+			r.persistRoom()
 			return
 		}
 	}
 	r.close()
 }
 
-// takeOver lets a medium AI play for a human seat.
-func (r *Room) takeOver(idx int) {
-	st := &r.seats[idx]
-	if st.bot || r.status != "playing" {
-		return
-	}
-	st.bot = true
-	r.broadcastRoom()
-	r.scheduleTurn()
-}
-
 func (r *Room) resetIdle() {
-	if r.idleTimer != nil {
-		r.idleTimer.Stop()
+	r.stopIdleTimer()
+	if r.cfg.IdleClose <= 0 {
+		return
 	}
 	r.idleTimer = time.AfterFunc(r.cfg.IdleClose, func() {
 		r.post(func() {
@@ -279,6 +251,35 @@ func (r *Room) resetIdle() {
 	})
 }
 
+func (r *Room) stopIdleTimer() {
+	if r.idleTimer != nil {
+		r.idleTimer.Stop()
+		r.idleTimer = nil
+	}
+}
+
+func (r *Room) setIdleClose(d time.Duration) {
+	r.cfg.IdleClose = d
+	if len(r.clients) == 0 && !r.closed {
+		r.resetIdle()
+	}
+}
+
+// stop ends the actor without writing anything to the database; the room is
+// restored by the next server process.
+func (r *Room) stop() {
+	if r.closed {
+		return
+	}
+	r.closed = true
+	if r.turnTimer != nil {
+		r.turnTimer.Stop()
+	}
+	r.stopIdleTimer()
+	r.hub.remove(r.id)
+	r.cancel()
+}
+
 func (r *Room) close() {
 	if r.closed {
 		return
@@ -287,21 +288,41 @@ func (r *Room) close() {
 	if r.status == "playing" && r.gameID != 0 {
 		r.hub.store.FinishGame(context.Background(), r.gameID, "aborted", r.points(), nil)
 	}
-	for i := range r.seats {
-		if r.seats[i].discTimer != nil {
-			r.seats[i].discTimer.Stop()
-		}
-	}
 	if r.turnTimer != nil {
 		r.turnTimer.Stop()
 	}
-	if r.idleTimer != nil {
-		r.idleTimer.Stop()
-	}
+	r.stopIdleTimer()
+	r.deleteRoomRecord()
 	r.status = "closed"
 	r.broadcastRoom()
 	r.hub.remove(r.id)
 	r.cancel()
+}
+
+// persistRoom writes the room metadata so it can be restored after a restart.
+func (r *Room) persistRoom() error {
+	if r.closed || (r.status != "waiting" && r.status != "playing") {
+		return nil
+	}
+	seats := make([]store.RoomSeat, len(r.seats))
+	for i, st := range r.seats {
+		seats[i] = store.RoomSeat{Kind: st.kind, UserID: st.userID, Name: st.name, Level: string(st.level)}
+	}
+	err := r.hub.store.SaveRoom(context.Background(), store.RoomRecord{
+		ID: r.id, Name: r.name, OwnerID: r.ownerID, OwnerName: r.ownerName, Status: r.status,
+		Hints: r.hints, TurnSeconds: r.turnSeconds, Seats: seats, GameID: r.gameID,
+		CreatedAt: r.createdAt.Unix(),
+	})
+	if err != nil {
+		fmt.Println("store room:", err)
+	}
+	return err
+}
+
+func (r *Room) deleteRoomRecord() {
+	if err := r.hub.store.DeleteRoom(context.Background(), r.id); err != nil {
+		fmt.Println("store delete room:", err)
+	}
 }
 
 func (r *Room) handle(s *Session, e Envelope) {
@@ -350,7 +371,7 @@ func (r *Room) handle(s *Session, e Envelope) {
 			fail("对局未在进行")
 			return
 		}
-		if idx < 0 || idx != int(r.game.Current) || r.seats[idx].kind != SeatHuman || r.seats[idx].bot {
+		if idx < 0 || idx != int(r.game.Current) || r.seats[idx].kind != SeatHuman {
 			fail("还没轮到你")
 			return
 		}
@@ -390,6 +411,7 @@ func (r *Room) setSeat(s *Session, p SetSeatPayload) string {
 	default:
 		return "座位类型无效"
 	}
+	r.persistRoom()
 	return ""
 }
 
@@ -453,6 +475,7 @@ func (r *Room) start(s *Session) string {
 	r.hintCache, r.hintBusy = map[int]hintEntry{}, map[int]int{}
 	r.reviews, r.curve = map[int][]ai.MoveReview{}, map[int][]CurvePoint{}
 	r.history = nil
+	r.persistRoom()
 	r.broadcastRoom()
 	r.broadcastViews()
 	r.scheduleTurn()
@@ -460,8 +483,18 @@ func (r *Room) start(s *Session) string {
 }
 
 func (r *Room) aiControlled(idx int) bool {
-	st := &r.seats[idx]
-	return st.kind == SeatAI || st.bot
+	return r.seats[idx].kind == SeatAI
+}
+
+// hasOnlineHuman reports whether a seated human is currently connected. With
+// nobody online the game pauses: no AI thinking and no turn timers.
+func (r *Room) hasOnlineHuman() bool {
+	for _, idx := range r.clients {
+		if idx >= 0 && idx < len(r.seats) && r.seats[idx].kind == SeatHuman {
+			return true
+		}
+	}
+	return false
 }
 
 // scheduleTurn starts AI thinking or the human turn timer for the current decision.
@@ -471,11 +504,14 @@ func (r *Room) scheduleTurn() {
 		r.turnTimer = nil
 	}
 	r.deadline = time.Time{}
-	if r.status != "playing" {
+	if r.status != "playing" || !r.hasOnlineHuman() {
 		return
 	}
 	cur := int(r.game.Current)
 	if !r.aiControlled(cur) {
+		if !r.seatConnected(cur) {
+			return // wait for the current player to come back
+		}
 		if r.turnSeconds > 0 {
 			seq := r.seq
 			r.deadline = time.Now().Add(time.Duration(r.turnSeconds) * time.Second)
@@ -492,7 +528,7 @@ func (r *Room) scheduleTurn() {
 	seq := r.seq
 	m := r.game.MaskFor(cur)
 	agent := r.agents[cur]
-	if r.seats[cur].bot || agent == nil {
+	if agent == nil {
 		agent = r.bot
 	}
 	ctx := r.ctx
@@ -510,19 +546,26 @@ func (r *Room) scheduleTurn() {
 			}
 		}
 		r.post(func() {
+			r.aiPending = -1
 			if r.seq != seq || r.status != "playing" || !r.aiControlled(cur) {
 				return
 			}
-			r.aiPending = -1
-			if err := r.applyMove(cur, a, false); err != nil {
-				// Should never happen; fall back to the first legal move.
-				r.applyMove(cur, r.game.LegalActions(nil)[0], false)
-			}
+			r.autoMove(cur, a)
 		})
 	}()
 }
 
-// timeout makes a quick medium-AI move for a human who ran out of time.
+// autoMove applies a move chosen without player input (AI or turn timeout).
+func (r *Room) autoMove(cur int, a engine.Action) {
+	if err := r.applyMove(cur, a, false); err != nil {
+		fmt.Println("auto move:", err)
+		time.AfterFunc(time.Second, func() {
+			r.post(func() { r.scheduleTurn() })
+		})
+	}
+}
+
+// timeout makes a quick medium-AI move for a connected human who ran out of time.
 func (r *Room) timeout(seq int) {
 	if r.seq != seq || r.status != "playing" {
 		return
@@ -530,24 +573,27 @@ func (r *Room) timeout(seq int) {
 	cur := int(r.game.Current)
 	m := r.game.MaskFor(cur)
 	a, _ := r.bot.Choose(r.ctx, &m, cur)
-	if r.applyMove(cur, a, false) != nil {
-		r.applyMove(cur, r.game.LegalActions(nil)[0], false)
-	}
+	r.autoMove(cur, a)
 }
 
 // applyMove validates and applies a move, records it and notifies everyone.
 func (r *Room) applyMove(idx int, a engine.Action, human bool) error {
+	if err := r.game.Validate(a); err != nil {
+		return err
+	}
 	pre := r.game.MaskFor(idx)
+	b, _ := json.Marshal(a)
+	seq := r.seq
+	// Record first: a restart replays the action log, so a move must never be
+	// applied without being stored.
+	if err := r.hub.store.AddAction(context.Background(), r.gameID, seq, idx, string(b)); err != nil {
+		return fmt.Errorf("保存动作失败：%w", err)
+	}
 	evs, err := r.game.Apply(a)
 	if err != nil {
 		return err
 	}
-	seq := r.seq
 	r.seq++
-	b, _ := json.Marshal(a)
-	if err := r.hub.store.AddAction(r.ctx, r.gameID, seq, idx, string(b)); err != nil {
-		fmt.Println("store action:", err)
-	}
 	batch := make([]seqEvent, len(evs))
 	for i, ev := range evs {
 		batch[i] = seqEvent{ev: ev, seq: seq}
@@ -602,6 +648,7 @@ func (r *Room) finish() {
 	if err := r.hub.store.FinishGame(context.Background(), r.gameID, "finished", r.points(), winners); err != nil {
 		fmt.Println("store finish:", err)
 	}
+	r.deleteRoomRecord()
 	r.broadcastViews()
 	r.broadcastRoom()
 	for c, idx := range r.clients {
@@ -648,6 +695,13 @@ func (r *Room) requestHint(s *Session, idx int, reqID string) {
 	m := r.game.MaskFor(idx)
 	go func() {
 		an := r.hard.Analyze(r.ctx, &m, idx, true)
+		if an != nil && r.ctx.Err() == nil {
+			if b, err := json.Marshal(an); err == nil {
+				if err := r.hub.store.SetHint(context.Background(), r.gameID, idx, seq, string(b)); err != nil {
+					fmt.Println("store hint:", err)
+				}
+			}
+		}
 		r.post(func() {
 			delete(r.hintBusy, idx)
 			r.hintCache[idx] = hintEntry{seq: seq, an: an}
@@ -679,6 +733,9 @@ func (r *Room) review(idx int, pre engine.GameState, a engine.Action, seq int) {
 			r.curve[idx] = append(r.curve[idx], CurvePoint{Turn: turn, WinRate: rv.PlayedWinRate, Best: rv.BestWinRate})
 			b, _ := json.Marshal(rv)
 			r.hub.store.SetReview(context.Background(), r.gameID, seq, string(b))
+			if err := r.hub.store.AddCurvePoint(context.Background(), r.gameID, idx, turn, rv.PlayedWinRate, rv.BestWinRate); err != nil {
+				fmt.Println("store curve:", err)
+			}
 			r.sendSeat(idx, envelope(MsgMoveReview, r.id, ReviewPayload{Turn: turn, Review: rv}))
 		})
 	}()
@@ -714,7 +771,7 @@ func (r *Room) state(yourSeat int) RoomState {
 	for i := range r.seats {
 		s := &r.seats[i]
 		st.Seats = append(st.Seats, SeatInfo{Index: i, Kind: s.kind, UserID: s.userID, Name: s.displayName(),
-			Level: string(s.level), Connected: s.kind == SeatAI || r.seatConnected(i), Bot: s.bot})
+			Level: string(s.level), Connected: s.kind == SeatAI || r.seatConnected(i)})
 	}
 	for _, i := range r.clients {
 		if i < 0 {

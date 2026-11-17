@@ -17,21 +17,19 @@ import (
 
 // Config tunes room behaviour.
 type Config struct {
-	AIDelay        time.Duration // minimum time an AI move takes, for display
-	HardBudget     time.Duration // hard AI thinking time per move
-	HintBudget     time.Duration // analysis time for hints and move reviews
-	ReconnectGrace time.Duration // how long a disconnected seat is kept before a bot takes over
-	IdleClose      time.Duration // close rooms with no connected clients after this long
+	AIDelay    time.Duration // minimum time an AI move takes, for display
+	HardBudget time.Duration // hard AI thinking time per move
+	HintBudget time.Duration // analysis time for hints and move reviews
+	IdleClose  time.Duration // close rooms with no connected clients after this long (0 = never)
 }
 
-// DefaultConfig follows the plan: 600ms AI display delay, 1.5s hard budget, 120s reconnect grace.
+// DefaultConfig follows the plan: 600ms AI display delay, 1.5s hard budget, 7-day idle cleanup.
 func DefaultConfig() Config {
 	return Config{
-		AIDelay:        600 * time.Millisecond,
-		HardBudget:     1500 * time.Millisecond,
-		HintBudget:     1500 * time.Millisecond,
-		ReconnectGrace: 120 * time.Second,
-		IdleClose:      120 * time.Second,
+		AIDelay:    600 * time.Millisecond,
+		HardBudget: 1500 * time.Millisecond,
+		HintBudget: 1500 * time.Millisecond,
+		IdleClose:  168 * time.Hour,
 	}
 }
 
@@ -135,6 +133,10 @@ func (h *Hub) Create(ownerID int64, ownerName string, set RoomSettings) (*Room, 
 		id = newID()
 	}
 	r := newRoom(h, id, name, ownerID, ownerName, seats, hints, set.TurnSeconds)
+	if err := r.persistRoom(); err != nil {
+		r.cancel()
+		return nil, err
+	}
 	h.rooms[id] = r
 	go r.loop()
 	return r, nil
@@ -173,17 +175,66 @@ func (h *Hub) remove(id string) {
 	h.mu.Unlock()
 }
 
-// Close stops all rooms.
-func (h *Hub) Close() {
+func (h *Hub) snapshot() []*Room {
 	h.mu.Lock()
+	defer h.mu.Unlock()
 	rooms := make([]*Room, 0, len(h.rooms))
 	for _, r := range h.rooms {
 		rooms = append(rooms, r)
 	}
-	h.mu.Unlock()
-	for _, r := range rooms {
+	return rooms
+}
+
+// Close stops all rooms and aborts their games (used for tests and hard shutdown).
+func (h *Hub) Close() {
+	for _, r := range h.snapshot() {
 		r.post(r.close)
+		r.wait()
 	}
+}
+
+// Shutdown stops the room actors without touching persisted rooms or game
+// records, so the next server process can restore them.
+func (h *Hub) Shutdown() {
+	for _, r := range h.snapshot() {
+		r.post(r.stop)
+		r.wait()
+	}
+}
+
+func (r *Room) wait() {
+	select {
+	case <-r.done:
+	case <-time.After(2 * time.Second):
+	}
+}
+
+// SetIdleClose changes the idle cleanup delay at runtime; 0 disables cleanup.
+func (h *Hub) SetIdleClose(d time.Duration) {
+	h.mu.Lock()
+	h.cfg.IdleClose = d
+	h.mu.Unlock()
+	for _, r := range h.snapshot() {
+		r.post(func() { r.setIdleClose(d) })
+	}
+}
+
+// IdleClose returns the current idle cleanup delay.
+func (h *Hub) IdleClose() time.Duration {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.cfg.IdleClose
+}
+
+// CloseRoom closes a room immediately (admin action). It reports whether the
+// room existed.
+func (h *Hub) CloseRoom(id string) bool {
+	r := h.Get(id)
+	if r == nil {
+		return false
+	}
+	r.post(r.close)
+	return true
 }
 
 const idAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"

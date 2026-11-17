@@ -4,7 +4,8 @@
 
 - **服务端权威**：规则判定、AI 计算、提示分析全部在服务端完成。每个客户端只收到按座位过滤后的视图，看不到牌堆顺序，也看不到对手从牌堆暗扣的牌。
 - **账号**：用户名 + 密码（bcrypt 哈希）登录，签发 JWT（HS256，24 小时有效），数据存 SQLite（纯 Go 的 `modernc.org/sqlite`，无需 CGO）。
-- **多人联机**：大厅、房间、2–4 人对局，可自由混合真人座位和简单 / 中等 / 困难三档 AI；支持断线重连、AI 托管、回合计时。
+- **多人联机**：大厅、房间、2–4 人对局，可自由混合真人座位和简单 / 中等 / 困难三档 AI；支持断线重连、回合计时。
+- **房间持久化**：等待中和进行中的房间写入 SQLite，服务重启后自动恢复（含局面、提示缓存、胜率曲线与复盘）。无在线真人时对局暂停等待，断线真人不会被 AI 托管；长时间无人访问的房间按管理员配置的时长自动清理（默认 7 天）。
 - **高手 AI 与提示**：困难 AI 基于信息集 MCTS 实时演算，并在残局切换为精确搜索。提示功能使用同一个困难 AI，给出前 3 个候选着法、各自胜率、预期后续着法以及中文原因；练习时每一步走完都会复盘，标出失误。
 - **部署**：`./deploy.sh` 生成独立 Go 二进制和静态资源，生产环境由 nginx 托管前端并代理 API / WebSocket；`deploy/deploy.sh` 按本机其他服务的方式一键部署到 nginx 子路径 `/gem/`；也保留 `make build` 的 `embed` 单文件构建方式。
 
@@ -139,7 +140,7 @@ sudo systemctl reload nginx
 
 访问配置的域名即可使用 Web 客户端，`/api/healthz` 可检查后端是否可达。生产环境应在 nginx 配置 HTTPS 证书并重定向 HTTP；前端使用构建时的 `base` 拼接 API、WebSocket 与路由，HTTPS 下会自动切换为 `wss`。上面的示例挂在域名根路径；要与其他服务共用域名并挂在子路径（如 `/gem/`），使用 `deploy/deploy.sh`，它会在构建时传入对应的 `--base`。
 
-更新时重新执行 `./deploy.sh`，替换服务器上的 `bin/` 与 `web/` 并重启后端，不替换数据库或 JWT 密钥。后端重启会中断正在进行的对局，请安排维护窗口。
+更新时重新执行 `./deploy.sh`，替换服务器上的 `bin/` 与 `web/` 并重启后端，不替换数据库或 JWT 密钥。重启会短暂断开所有连接，但等待中/进行中的房间会在启动时从数据库恢复，重新进入即可继续对局。
 
 ### 服务端参数
 
@@ -152,6 +153,15 @@ sudo systemctl reload nginx
 | `-hard-ms` | | 1500 | 困难 AI 每步的思考时间 |
 | `-hint-ms` | | 1500 | 提示分析时间 |
 | `-ai-delay-ms` | | 600 | AI 出手的最短展示延迟 |
+| `-admin-user` | `GEM_ADMIN_USER` | `mango` | 启动时把该账号提升为管理员（空值禁用） |
+| `-idle-close` | `GEM_IDLE_CLOSE` | `168h` | 无客户端连接的房间在该时长后自动关闭；`0` 表示不自动清理。仅作为 settings 表无记录时的初始值，管理页修改后以数据库为准 |
+
+### 房间持久化与管理员
+
+- 房间元数据存于 `rooms` 表；进行中的对局通过 `games.seed` + `game_actions` 重放恢复，提示缓存、胜率曲线、复盘分别持久化。已结束的对局只保留数据库记录，供战绩与回放查看，不再出现在房间列表中。
+- 房间内没有任何在线真人时，回合调度（含回合计时与 AI 落子）暂停；有人重新加入后从当前局面继续。当前回合的真人离线时，对局等待其本人回来，不会由 AI 接管；只有在线真人超时才会由 AI 替走一步（房主开启回合计时时）。
+- 管理员账号（默认 `mango`）在顶栏可见“管理”入口，可设置自动清理时长（`0` 为不清理）并手动关闭任意房间。自动清理同时会放弃未结束的对局；优雅重启（`systemctl restart` / 进程正常退出）不会中断或删除房间，只有管理员关房或超时清理才会。
+- 系统服务可用 `Environment=GEM_ADMIN_USER=...` 与 `Environment=GEM_IDLE_CLOSE=...` 覆盖默认值；`/etc/gem-v2.env` 由部署脚本保留，可手动追加这两项。
 
 ### Docker
 
@@ -242,8 +252,8 @@ internal/engine  纯规则引擎：卡牌数据、阶段机、合法动作、视
 internal/ai      特征、评估、三档 AI、残局搜索、提示解释、走后复盘
 internal/arena   批量对局与统计
 internal/auth    bcrypt、JWT、HTTP/WS 鉴权中间件
-internal/store   SQLite 仓储与嵌入式迁移（users / games / game_players / game_actions）
-internal/game    大厅 Hub、房间 actor、AI 座位调度、断线托管
+internal/store   SQLite 仓储与嵌入式迁移（users / games / game_actions / rooms / settings / 提示与曲线）
+internal/game    大厅 Hub、房间 actor、AI 座位调度、对局持久化与重启恢复
 internal/api     REST 路由、WebSocket 处理
 internal/cli     终端界面、离线与联机后端
 web/             React 18 + Vite + TypeScript + Tailwind + Zustand

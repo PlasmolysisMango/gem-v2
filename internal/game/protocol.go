@@ -75,8 +75,6 @@ type SeatInfo struct {
 	Name      string `json:"name"`
 	Level     string `json:"level,omitempty"`
 	Connected bool   `json:"connected"`
-	// Bot is set when a medium AI plays for a disconnected human.
-	Bot bool `json:"bot,omitempty"`
 }
 
 // RoomSettings are chosen at creation.

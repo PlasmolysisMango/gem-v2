@@ -91,7 +91,6 @@ export interface SeatInfo {
   name: string
   level?: AILevel
   connected: boolean
-  bot?: boolean
 }
 
 export interface RoomState {
@@ -215,7 +214,12 @@ export interface ChatMessage {
 export interface User {
   id: number
   username: string
+  isAdmin: boolean
   createdAt: string
+}
+
+export interface AdminSettings {
+  idleCloseSeconds: number
 }
 
 export interface GamePlayer {

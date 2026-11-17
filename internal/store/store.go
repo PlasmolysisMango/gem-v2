@@ -96,6 +96,7 @@ type User struct {
 	ID        int64     `json:"id"`
 	Username  string    `json:"username"`
 	PwHash    string    `json:"-"`
+	IsAdmin   bool      `json:"isAdmin"`
 	CreatedAt time.Time `json:"createdAt"`
 }
 
@@ -115,7 +116,7 @@ func (s *Store) CreateUser(ctx context.Context, username, pwHash string) (User, 
 func (s *Store) scanUser(row *sql.Row) (User, error) {
 	var u User
 	var ts int64
-	if err := row.Scan(&u.ID, &u.Username, &u.PwHash, &ts); err != nil {
+	if err := row.Scan(&u.ID, &u.Username, &u.PwHash, &u.IsAdmin, &ts); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, ErrNotFound
 		}
@@ -126,11 +127,22 @@ func (s *Store) scanUser(row *sql.Row) (User, error) {
 }
 
 func (s *Store) UserByName(ctx context.Context, username string) (User, error) {
-	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, pw_hash, created_at FROM users WHERE username = ?`, username))
+	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, pw_hash, is_admin, created_at FROM users WHERE username = ?`, username))
 }
 
 func (s *Store) UserByID(ctx context.Context, id int64) (User, error) {
-	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, pw_hash, created_at FROM users WHERE id = ?`, id))
+	return s.scanUser(s.db.QueryRowContext(ctx, `SELECT id, username, pw_hash, is_admin, created_at FROM users WHERE id = ?`, id))
+}
+
+// PromoteAdmin grants admin rights to an existing account. It reports whether
+// a user was found; an unknown account is not an error at startup.
+func (s *Store) PromoteAdmin(ctx context.Context, username string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE users SET is_admin = 1 WHERE username = ?`, username)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
 }
 
 // GamePlayer is one seat of a recorded game.
@@ -204,10 +216,20 @@ func (s *Store) SetReview(ctx context.Context, gameID int64, seq int, reviewJSON
 	return err
 }
 
-// AbortUnfinished marks games left "playing" by a previous server process as aborted
-// (rooms live in memory and do not survive a restart).
+// AbortUnfinished marks every game still "playing" as aborted.
 func (s *Store) AbortUnfinished(ctx context.Context) (int64, error) {
 	res, err := s.db.ExecContext(ctx, `UPDATE games SET status = 'aborted', ended_at = ? WHERE status = 'playing'`, time.Now().Unix())
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
+// AbortOrphanGames aborts running games that no persisted room owns, i.e. games
+// whose room was lost or was never written by an older server version.
+func (s *Store) AbortOrphanGames(ctx context.Context) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `UPDATE games SET status = 'aborted', ended_at = ?
+		WHERE status = 'playing' AND id NOT IN (SELECT game_id FROM rooms WHERE game_id IS NOT NULL)`, time.Now().Unix())
 	if err != nil {
 		return 0, err
 	}

@@ -39,6 +39,9 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("POST /api/rooms", protected(s.createRoom))
 	mux.Handle("GET /api/games/{id}", protected(s.gameRecord))
 	mux.Handle("GET /api/users/{id}/stats", protected(s.stats))
+	mux.Handle("GET /api/admin/settings", s.adminOnly(s.adminGetSettings))
+	mux.Handle("PUT /api/admin/settings", s.adminOnly(s.adminPutSettings))
+	mux.Handle("DELETE /api/admin/rooms/{id}", s.adminOnly(s.adminCloseRoom))
 	mux.HandleFunc("GET /ws", s.ws)
 	if s.Static != nil {
 		mux.Handle("/", spa(s.Static))
@@ -249,10 +252,11 @@ func spa(fsys fs.FS) http.Handler {
 	})
 }
 
-// Shutdown helper for graceful stop.
+// Shutdown helper for graceful stop. Persisted rooms survive; the next server
+// process restores them.
 func Shutdown(srv *http.Server, hub *game.Hub) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	hub.Close()
+	hub.Shutdown()
 	srv.Shutdown(ctx)
 }

@@ -71,3 +71,115 @@ func TestStoreRoundTrip(t *testing.T) {
 		t.Fatalf("finished game changed: %+v", g)
 	}
 }
+
+func TestRoomsAdminSettingsHintsCurves(t *testing.T) {
+	st, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	ctx := context.Background()
+
+	u, err := st.CreateUser(ctx, "mango", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u.IsAdmin {
+		t.Fatal("new accounts must not be admin")
+	}
+	if ok, err := st.PromoteAdmin(ctx, "MANGO"); err != nil || !ok {
+		t.Fatalf("promote: %v %v", ok, err)
+	}
+	if u, err = st.UserByName(ctx, "mango"); err != nil || !u.IsAdmin {
+		t.Fatalf("admin flag: %v %+v", err, u)
+	}
+	if ok, err := st.PromoteAdmin(ctx, "nobody"); err != nil || ok {
+		t.Fatalf("promote unknown: %v %v", ok, err)
+	}
+
+	if _, ok, err := st.GetSetting(ctx, "idle_close_seconds"); err != nil || ok {
+		t.Fatalf("missing setting: %v %v", ok, err)
+	}
+	if err := st.SetSetting(ctx, "idle_close_seconds", "604800"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetSetting(ctx, "idle_close_seconds", "0"); err != nil {
+		t.Fatal(err)
+	}
+	if v, ok, err := st.GetSetting(ctx, "idle_close_seconds"); err != nil || !ok || v != "0" {
+		t.Fatalf("setting: %q %v %v", v, ok, err)
+	}
+
+	gid, err := st.CreateGame(ctx, "ROOMAA", 42, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "medium"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := RoomRecord{ID: "ROOMAA", Name: "persisted", OwnerID: u.ID, OwnerName: "mango", Status: "waiting",
+		Hints: true, TurnSeconds: 30, Seats: []RoomSeat{
+			{Kind: "human", UserID: u.ID, Name: "mango"},
+			{Kind: "ai", Level: "medium"},
+		}}
+	if err := st.SaveRoom(ctx, rec); err != nil {
+		t.Fatal(err)
+	}
+	rec.Status, rec.GameID = "playing", gid
+	if err := st.SaveRoom(ctx, rec); err != nil {
+		t.Fatal(err)
+	}
+	rooms, err := st.LoadRooms(ctx)
+	if err != nil || len(rooms) != 1 {
+		t.Fatalf("load rooms: %v %+v", err, rooms)
+	}
+	got := rooms[0]
+	if got.Status != "playing" || got.GameID != gid || got.TurnSeconds != 30 || len(got.Seats) != 2 ||
+		got.Seats[0].Name != "mango" || got.Seats[1].Level != "medium" || got.CreatedAt == 0 {
+		t.Fatalf("room round trip: %+v", got)
+	}
+
+	if err := st.SetHint(ctx, gid, 0, 1, `{"winRate":0.4}`); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.SetHint(ctx, gid, 0, 3, `{"winRate":0.6}`); err != nil {
+		t.Fatal(err)
+	}
+	hints, err := st.HintsByGame(ctx, gid)
+	if err != nil || len(hints) != 1 || hints[0].Seq != 3 || hints[0].Analysis != `{"winRate":0.6}` {
+		t.Fatalf("hints: %v %+v", err, hints)
+	}
+
+	if err := st.AddCurvePoint(ctx, gid, 0, 4, 0.5, 0.7); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddCurvePoint(ctx, gid, 0, 4, 0.55, 0.75); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.AddCurvePoint(ctx, gid, 0, 5, 0.6, 0.8); err != nil {
+		t.Fatal(err)
+	}
+	curves, err := st.CurveByGame(ctx, gid)
+	if err != nil || len(curves[0]) != 2 || curves[0][0].WinRate != 0.55 || curves[0][1].Best != 0.8 {
+		t.Fatalf("curves: %v %+v", err, curves)
+	}
+
+	// Orphaned games are aborted; the game owned by a persisted room survives.
+	orphan, err := st.CreateGame(ctx, "ROOMBB", 7, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "easy"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.AbortOrphanGames(ctx); err != nil || n != 1 {
+		t.Fatalf("abort orphans: %d %v", n, err)
+	}
+	if g, _ := st.Game(ctx, orphan); g.Status != "aborted" {
+		t.Fatalf("orphan status: %s", g.Status)
+	}
+	if g, _ := st.Game(ctx, gid); g.Status != "playing" {
+		t.Fatalf("owned game status: %s", g.Status)
+	}
+
+	if err := st.DeleteRoom(ctx, rec.ID); err != nil {
+		t.Fatal(err)
+	}
+	if rooms, err := st.LoadRooms(ctx); err != nil || len(rooms) != 0 {
+		t.Fatalf("rooms after delete: %v %+v", err, rooms)
+	}
+}

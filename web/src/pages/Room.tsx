@@ -84,14 +84,13 @@ export default function Room() {
 
   const view = g.view
   const myTurn = view.viewer >= 0 && view.current === view.viewer && view.phase !== 'over'
-  const mySeat = view.viewer >= 0 ? room.seats[view.viewer] : undefined
   const hintAction = g.hint?.candidates[focus]?.action
   const order =
     view.viewer >= 0 ? [...Array(view.nPlayers).keys()].map((i) => (i + view.viewer) % view.nPlayers) : [...Array(view.nPlayers).keys()]
   const opponents = order.filter((s) => s !== view.viewer)
   const moves = lastMoves(g.log, (s) => seatLabel(room, s))
   const moveEvents = lastMoveEvents(g.log)
-  const leaveText = view.phase === 'over' || view.viewer < 0 ? '离开' : '认输离开（AI 托管）'
+  const leaveText = '离开'
   // chat keeps the last 100 messages, so count what arrived after the last one seen
   const unread = g.chat.length - 1 - (chatSeen ? g.chat.lastIndexOf(chatSeen) : -1)
 
@@ -132,8 +131,7 @@ export default function Room() {
           日志
         </button>
         <button className="btn text-xs !px-2 sm:!px-3" onClick={leave} aria-label={leaveText}>
-          <span className="sm:hidden">{view.phase === 'over' || view.viewer < 0 ? '离开' : '认输离开'}</span>
-          <span className="hidden sm:inline">{leaveText}</span>
+          {leaveText}
         </button>
       </div>
       <div className={`min-w-0 flex flex-col gap-2 sm:gap-3 xl:flex-1 xl:min-h-0 xl:grid xl:gap-3 ${view.viewer >= 0
@@ -148,7 +146,7 @@ export default function Room() {
           ))}
         </section>
         <section id="room-board" aria-label="棋盘" className="min-w-0 scroll-mt-2 xl:min-h-0">
-          <GameBoard view={view} room={room} onAct={view.viewer >= 0 && !mySeat?.bot ? g.act : undefined} hintAction={hintAction}
+          <GameBoard view={view} room={room} onAct={view.viewer >= 0 ? g.act : undefined} hintAction={hintAction}
             moves={moves} moveHistory={moveEvents} />
         </section>
         {view.viewer >= 0 && (
@@ -156,7 +154,7 @@ export default function Room() {
             <div id="room-hint" className="card xl:flex-1 xl:min-h-0 xl:overflow-y-auto">
               <HintPanel
                 enabled={room.hints}
-                myTurn={myTurn && view.phase === 'main' && !mySeat?.bot}
+                myTurn={myTurn && view.phase === 'main'}
                 loading={g.hintLoading}
                 hint={g.hint}
                 onRequest={g.requestHint}
@@ -199,9 +197,10 @@ function TurnBanner({ room, current, myTurn, phase }: { room: RoomState; current
     return <span className="px-2 py-0.5 rounded bg-yellow-500 text-slate-900 font-bold animate-pulse">{t}</span>
   }
   const s = room.seats[current]
+  const note = s?.kind === 'ai' ? '（AI 思考中…）' : s?.kind === 'human' && !s.connected ? '（离线，等待回来）' : ''
   return (
     <span className="text-slate-300">
-      等待 {s?.name || `玩家${current + 1}`} {s?.kind === 'ai' || s?.bot ? '（AI 思考中…）' : ''}
+      等待 {s?.name || `玩家${current + 1}`} {note}
     </span>
   )
 }

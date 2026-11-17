@@ -48,7 +48,6 @@ export function PlayerPanel({
         <span className={`min-w-0 break-words font-semibold ${compact ? 'text-sm leading-tight' : ''}`}>
           {own ? '我方 · ' : ''}{seatLabel(room, seat)}
           {seat === view.viewer && <span className="text-xs text-sky-300"> (你)</span>}
-          {info?.bot && <span className="text-xs text-amber-300"> 托管中</span>}
           {info && info.kind === 'human' && !info.connected && <span className="text-xs text-rose-300"> 离线</span>}
           {winner && <span className="text-xs text-yellow-300"> 🏆</span>}
         </span>

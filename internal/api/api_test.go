@@ -20,7 +20,7 @@ import (
 	"gem/internal/store"
 )
 
-func newTestServer(t *testing.T) (*httptest.Server, *game.Hub) {
+func newTestServer(t *testing.T) (*httptest.Server, *game.Hub, *store.Store) {
 	t.Helper()
 	st, err := store.Open(":memory:")
 	if err != nil {
@@ -39,7 +39,7 @@ func newTestServer(t *testing.T) (*httptest.Server, *game.Hub) {
 		hub.Close()
 		st.Close()
 	})
-	return srv, hub
+	return srv, hub, st
 }
 
 func doJSON(t *testing.T, method, url, token string, body, out any) int {
@@ -67,7 +67,7 @@ func doJSON(t *testing.T, method, url, token string, body, out any) int {
 }
 
 func TestAuthEndpoints(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, _, _ := newTestServer(t)
 	var ar AuthResponse
 	if c := doJSON(t, "POST", srv.URL+"/api/auth/register", "", credentials{"alice", "secret1"}, &ar); c != 201 || ar.Token == "" {
 		t.Fatalf("register: %d", c)
@@ -235,7 +235,7 @@ func waitRoom(t *testing.T, ctx context.Context, c *websocket.Conn, ok func(Room
 
 // TestFullGameTwoHumansTwoAIs plays a complete 4-player game: 2 humans over WebSocket + 2 AIs.
 func TestFullGameTwoHumansTwoAIs(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, _, _ := newTestServer(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
@@ -327,8 +327,49 @@ func TestFullGameTwoHumansTwoAIs(t *testing.T) {
 	}
 }
 
+func TestAdminEndpoints(t *testing.T) {
+	srv, hub, st := newTestServer(t)
+	var alice AuthResponse
+	doJSON(t, "POST", srv.URL+"/api/auth/register", "", credentials{"alice", "secret1"}, &alice)
+	if c := doJSON(t, "GET", srv.URL+"/api/admin/settings", alice.Token, nil, nil); c != 403 {
+		t.Fatalf("non-admin should get 403, got %d", c)
+	}
+	if ok, err := st.PromoteAdmin(context.Background(), "alice"); err != nil || !ok {
+		t.Fatalf("promote: %v %v", ok, err)
+	}
+	var cfg AdminSettings
+	if c := doJSON(t, "GET", srv.URL+"/api/admin/settings", alice.Token, nil, &cfg); c != 200 ||
+		cfg.IdleCloseSeconds != int64(game.DefaultConfig().IdleClose/time.Second) {
+		t.Fatalf("settings: %d %+v", c, cfg)
+	}
+	if c := doJSON(t, "PUT", srv.URL+"/api/admin/settings", alice.Token, AdminSettings{IdleCloseSeconds: 0}, &cfg); c != 200 || cfg.IdleCloseSeconds != 0 {
+		t.Fatalf("disable cleanup: %d %+v", c, cfg)
+	}
+	if hub.IdleClose() != 0 {
+		t.Fatalf("hub idle close = %s", hub.IdleClose())
+	}
+	if c := doJSON(t, "PUT", srv.URL+"/api/admin/settings", alice.Token, AdminSettings{IdleCloseSeconds: -1}, nil); c != 400 {
+		t.Fatalf("negative idle close should be 400, got %d", c)
+	}
+
+	var room RoomSummary
+	doJSON(t, "POST", srv.URL+"/api/rooms", alice.Token, RoomSettings{AIs: []string{"easy"}}, &room)
+	if c := doJSON(t, "DELETE", srv.URL+"/api/admin/rooms/"+room.ID, alice.Token, nil, nil); c != 204 {
+		t.Fatalf("close room: %d", c)
+	}
+	for i := 0; i < 200 && hub.Get(room.ID) != nil; i++ {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if hub.Get(room.ID) != nil {
+		t.Fatal("room was not closed")
+	}
+	if c := doJSON(t, "DELETE", srv.URL+"/api/admin/rooms/"+room.ID, alice.Token, nil, nil); c != 404 {
+		t.Fatalf("closing a missing room should be 404, got %d", c)
+	}
+}
+
 func TestReconnectKeepsSeat(t *testing.T) {
-	srv, hub := newTestServer(t)
+	srv, hub, _ := newTestServer(t)
 	_ = hub
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -364,7 +405,7 @@ func TestReconnectKeepsSeat(t *testing.T) {
 	c2 := dial(t, ctx, srv, alice.Token)
 	wsjson.Write(ctx, c2, Marshal(game.MsgJoinRoom, room.ID, nil))
 	rs := waitRoom(t, ctx, c2, func(rs RoomState) bool { return true })
-	if rs.YourSeat != 0 || rs.Status != "playing" || rs.Seats[0].Bot {
+	if rs.YourSeat != 0 || rs.Status != "playing" || !rs.Seats[0].Connected {
 		t.Fatalf("reconnect should restore seat: %+v", rs)
 	}
 	gotView := false
