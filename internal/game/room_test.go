@@ -28,6 +28,7 @@ func testHub(t *testing.T, turnSeconds int) (*Hub, *store.Store) {
 	cfg.MasterBudget = 40 * time.Millisecond
 	cfg.HintBudget = 60 * time.Millisecond
 	cfg.IdleClose = time.Hour
+	cfg.seed = func() uint64 { return engine.RandomFirstBit | 4 } // seat 0 for 2-4 players
 	h := NewHub(st, cfg)
 	t.Cleanup(func() {
 		h.Close()

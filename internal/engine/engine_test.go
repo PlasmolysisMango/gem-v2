@@ -121,6 +121,26 @@ func TestSetup(t *testing.T) {
 	}
 }
 
+func TestSeedDerivedFirstSeat(t *testing.T) {
+	for n := 2; n <= 4; n++ {
+		if s, _ := NewGame(n, 42); s.Current != 0 {
+			t.Fatalf("legacy seed changed starting seat: %d", s.Current)
+		}
+		seen := make(map[int8]bool)
+		for i := uint64(0); i < 16; i++ {
+			seed := RandomFirstBit | i
+			s, _ := NewGame(n, seed)
+			if want := int8(seed % uint64(n)); s.Current != want {
+				t.Fatalf("n=%d seed=%d: current=%d want %d", n, seed, s.Current, want)
+			}
+			seen[s.Current] = true
+		}
+		if len(seen) != n {
+			t.Fatalf("n=%d: reaching only %d starting seats", n, len(seen))
+		}
+	}
+}
+
 func TestTakeRules(t *testing.T) {
 	s, _ := NewGame(2, 1)
 	if _, err := s.Apply(Action{Type: ActTakeSame, Gems: Gems{2}}); err != nil {

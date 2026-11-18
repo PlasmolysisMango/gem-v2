@@ -18,6 +18,11 @@ func tokensPerColor(n int) int8 {
 	}
 }
 
+// RandomFirstBit marks seeds whose starting seat is derived from the seed.
+// Room seeds set it so restarts and replays reproduce the same first player;
+// seeds recorded before this bit existed never set it and still start at seat 0.
+const RandomFirstBit = uint64(1) << 63
+
 // NewGame creates a shuffled game for n (2..4) players using seed.
 func NewGame(n int, seed uint64) (GameState, error) {
 	if n < 2 || n > 4 {
@@ -26,6 +31,9 @@ func NewGame(n int, seed uint64) (GameState, error) {
 	rng := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15))
 	var s GameState
 	s.NPlayers = int8(n)
+	if seed&RandomFirstBit != 0 {
+		s.Current = int8(seed % uint64(n))
+	}
 	t := tokensPerColor(n)
 	for c := 0; c < NumGemColors; c++ {
 		s.Bank[c] = t

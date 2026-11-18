@@ -22,6 +22,7 @@ type Config struct {
 	MasterBudget time.Duration // master AI thinking time per move
 	HintBudget   time.Duration // analysis time for hints and move reviews
 	IdleClose    time.Duration // close rooms with no connected clients after this long (0 = never)
+	seed         func() uint64 // deterministic start seeds for tests; nil picks random
 }
 
 // DefaultConfig sets AI budgets, display delay and idle cleanup.

@@ -446,7 +446,7 @@ func (r *Room) start(s *Session) string {
 		}
 	}
 	r.seats = seats
-	seed := mrand.Uint64() >> 1
+	seed := r.cfg.startSeed()
 	g, err := engine.NewGame(len(seats), seed)
 	if err != nil {
 		return err.Error()
@@ -483,6 +483,15 @@ func (r *Room) start(s *Session) string {
 	r.broadcastViews()
 	r.scheduleTurn()
 	return ""
+}
+
+// startSeed marks the seed so the engine derives a random starting seat while
+// keeping it deterministic enough to recreate the game from storage.
+func (c Config) startSeed() uint64 {
+	if c.seed != nil {
+		return c.seed()
+	}
+	return mrand.Uint64()>>1 | engine.RandomFirstBit
 }
 
 func (r *Room) aiControlled(idx int) bool {
