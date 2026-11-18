@@ -19,11 +19,21 @@ function ReplayControls({ idx, n, playing, onIndexChange, onPlayingChange }: {
   return (
     <div aria-label="复盘控制" role="group" className="card !p-2 space-y-1">
       <div className="flex justify-center gap-1.5">
-        <button className={`btn ${buttonSize}`} aria-label="回到初始局面" disabled={idx === 0} onClick={() => onIndexChange(0)}>首</button>
-        <button className={`btn ${buttonSize}`} aria-label="上一手" disabled={idx === 0} onClick={() => onIndexChange(Math.max(0, idx - 1))}>前</button>
-        <button className={`btn-primary ${buttonSize}`} aria-label={playing ? '暂停' : '播放'} aria-pressed={playing} onClick={() => onPlayingChange(!playing)}>{playing ? '暂停' : '播放'}</button>
-        <button className={`btn ${buttonSize}`} aria-label="下一手" disabled={idx === n} onClick={() => onIndexChange(Math.min(n, idx + 1))}>后</button>
-        <button className={`btn ${buttonSize}`} aria-label="跳到最后一手" disabled={idx === n} onClick={() => onIndexChange(n)}>末</button>
+        <button className={`btn ${buttonSize}`} aria-label="回到初始局面" disabled={idx === 0} onClick={() => onIndexChange(0)}>
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M3 5h2v14H3zM13 5v14l-7-7zM21 5v14l-7-7z" /></svg>
+        </button>
+        <button className={`btn ${buttonSize}`} aria-label="上一手" disabled={idx === 0} onClick={() => onIndexChange(Math.max(0, idx - 1))}>
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M16 5v14L6 12z" /></svg>
+        </button>
+        <button className={`btn-primary ${buttonSize}`} aria-label={playing ? '暂停' : '播放'} aria-pressed={playing} onClick={() => onPlayingChange(!playing)}>
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d={playing ? 'M6 5h4v14H6zM14 5h4v14h-4z' : 'M8 5v14l10-7z'} /></svg>
+        </button>
+        <button className={`btn ${buttonSize}`} aria-label="下一手" disabled={idx === n} onClick={() => onIndexChange(Math.min(n, idx + 1))}>
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M8 5v14l10-7z" /></svg>
+        </button>
+        <button className={`btn ${buttonSize}`} aria-label="跳到最后一手" disabled={idx === n} onClick={() => onIndexChange(n)}>
+          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M19 5h2v14h-2zM11 5v14l7-7zM3 5v14l7-7z" /></svg>
+        </button>
       </div>
       <div className="flex items-center gap-2">
         <input aria-label="复盘进度" type="range" min={0} max={n} value={idx}
