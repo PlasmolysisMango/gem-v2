@@ -208,8 +208,9 @@ describe('Replay controls and analysis effects', () => {
     expect(controls[0]).toContain('flex justify-center')
     expect(controls[0]).toContain('aria-label="复盘进度"')
     expect(controls[0]).toContain('3/4')
+    expect(controls[0]).toContain('测试玩家3 的上一手')
     expect(controls[0]).toContain('测试失误')
-    expect(controls[0]!.indexOf('测试失误')).toBeGreaterThan(controls[0]!.indexOf('aria-label="复盘进度"'))
+    expect(controls[0]!.indexOf('测试玩家3 的上一手')).toBeGreaterThan(controls[0]!.indexOf('aria-label="复盘进度"'))
     expect(html).not.toMatch(/[⏮⏭◀▶]/)
     const players = html.match(/<section aria-label="玩家信息"[\s\S]*?<\/section>/)?.[0] ?? ''
     expect(html).toContain(`${players}<div class="min-w-0 xl:hidden">${controls[1]}</div>`)
