@@ -8,10 +8,11 @@ import { PlayerPanel, ReviewSummary, WinCurve } from '../components/Panels'
 import { LANDSCAPE_QUERY, frameMoveEvents, frameMoves } from '../lib/gems'
 import { LEVEL_NAME } from './Lobby'
 
-function ReplayControls({ idx, n, playing, onIndexChange, onPlayingChange }: {
+function ReplayControls({ idx, n, playing, review, onIndexChange, onPlayingChange }: {
   idx: number
   n: number
   playing: boolean
+  review: MoveReview | null
   onIndexChange: (idx: number) => void
   onPlayingChange: (playing: boolean) => void
 }) {
@@ -41,6 +42,7 @@ function ReplayControls({ idx, n, playing, onIndexChange, onPlayingChange }: {
           className="min-w-0 min-h-[44px] xl:min-h-[32px] flex-1" />
         <span className="shrink-0 font-mono text-xs">{idx}/{n}</span>
       </div>
+      {review && <ReviewBadge r={review} />}
     </div>
   )
 }
@@ -210,22 +212,17 @@ export default function Replay() {
           {view.players.map((p) => (
             <PlayerPanel key={p.seat} view={view} room={room} seat={p.seat} lastMove={moves.get(p.seat)} moveEvents={moveEvents.get(p.seat)} />
           ))}
-          <ReplayControls idx={idx} n={n} playing={playing} onIndexChange={setIdx} onPlayingChange={setPlaying} />
+          <ReplayControls idx={idx} n={n} playing={playing} review={frame?.review ?? null} onIndexChange={setIdx} onPlayingChange={setPlaying} />
         </section>
         <section id="replay-board" aria-label="棋盘" className="min-w-0 scroll-mt-2 flex flex-col gap-2 xl:min-h-0">
           <div className="card !p-2 flex flex-wrap items-center gap-2 shrink-0">
             <div className="w-full text-sm break-words">
               {frame ? `${label(frame.seat)} ${frame.text}` : '初始局面'}
             </div>
-            {frame?.review && (
-              <div className="w-full">
-                <ReviewBadge r={frame.review} />
-              </div>
-            )}
           </div>
           <div className="min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto">
             <GameBoard view={view} room={room} moves={moves} moveHistory={moveEvents} hintAction={hint?.candidates[focus]?.action}
-              playerFooter={<ReplayControls idx={idx} n={n} playing={playing} onIndexChange={setIdx} onPlayingChange={setPlaying} />} />
+              playerFooter={<ReplayControls idx={idx} n={n} playing={playing} review={frame?.review ?? null} onIndexChange={setIdx} onPlayingChange={setPlaying} />} />
           </div>
         </section>
         <aside className="min-w-0 flex flex-col gap-2 xl:min-h-0 xl:gap-3">

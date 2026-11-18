@@ -186,7 +186,7 @@ afterEach(() => {
 const seqs = () => requests.map((request) => request.seq)
 
 describe('Replay controls and analysis effects', () => {
-  it('places identical controls below all desktop players and immediately after mobile players, keeping action/review above the board', async () => {
+  it('places identical controls and the step verdict below all desktop players and immediately after mobile players, keeping only the action text above the board', async () => {
     vi.mocked(api.game).mockResolvedValue(savedFixture())
     await harness.settle()
     harness.jump(3)
@@ -196,7 +196,7 @@ describe('Replay controls and analysis effects', () => {
     for (let seat = 1; seat <= 4; seat++) {
       expect(desktop.indexOf(`测试玩家${seat}`)).toBeLessThan(desktop.indexOf('aria-label="复盘控制"'))
     }
-    const controls = html.match(/<div aria-label="复盘控制"[\s\S]*?<\/span><\/div><\/div>/g) ?? []
+    const controls = html.match(/<div aria-label="复盘控制"[\s\S]*?aria-label="复盘进度"[\s\S]*?<\/span><\/div>[\s\S]*?<\/div><\/div>/g) ?? []
     expect(controls).toHaveLength(2)
     expect(controls[0]).toBe(controls[1])
     expect((controls[0] ?? '').match(/<button\b/g)).toHaveLength(5)
@@ -208,12 +208,14 @@ describe('Replay controls and analysis effects', () => {
     expect(controls[0]).toContain('flex justify-center')
     expect(controls[0]).toContain('aria-label="复盘进度"')
     expect(controls[0]).toContain('3/4')
+    expect(controls[0]).toContain('测试失误')
+    expect(controls[0]!.indexOf('测试失误')).toBeGreaterThan(controls[0]!.indexOf('aria-label="复盘进度"'))
     expect(html).not.toMatch(/[⏮⏭◀▶]/)
     const players = html.match(/<section aria-label="玩家信息"[\s\S]*?<\/section>/)?.[0] ?? ''
     expect(html).toContain(`${players}<div class="min-w-0 xl:hidden">${controls[1]}</div>`)
     const board = html.slice(html.indexOf('<section id="replay-board"'))
     expect(board.indexOf('测试行动30')).toBeLessThan(board.indexOf('class="game-board'))
-    expect(board.indexOf('测试失误')).toBeLessThan(board.indexOf('class="game-board'))
+    expect(board.slice(0, board.indexOf('class="game-board'))).not.toContain('测试失误')
     expect(board.slice(0, board.indexOf('class="game-board'))).not.toContain('aria-label="复盘控制"')
     expect(requests).toHaveLength(0)
   })
