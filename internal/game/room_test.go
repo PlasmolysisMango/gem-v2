@@ -168,89 +168,136 @@ drained:
 // TestRestoreRoomReplaysGame restores a running room from the same store after
 // a graceful shutdown and checks the position and cached hint survive.
 func TestRestoreRoomReplaysGame(t *testing.T) {
+	for _, level := range []string{"medium", "noble"} {
+		t.Run(level, func(t *testing.T) {
+			h, st := testHub(t, 0)
+			room, err := h.Create(1, "alice", RoomSettings{AIs: []string{level}, Hints: boolPtr(true)})
+			if err != nil {
+				t.Fatal(err)
+			}
+			roomID := room.ID()
+			owner := NewSession(1, "alice")
+			startRoom(t, h, owner, room)
+
+			view := decode[GameViewPayload](t, waitEnv(t, owner, 2*time.Second, func(e Envelope) bool {
+				return e.Type == MsgGameView && decode[GameViewPayload](t, e).View.Current == 0
+			})).View
+			room.Handle(owner, Envelope{Type: MsgAction, Payload: mustJSON(ActionPayload{Action: view.Legal[0]})})
+
+			reviewSeen, atOurTurn := false, false
+			var turn int
+			for !reviewSeen || !atOurTurn {
+				e := readEnv(t, owner, 10*time.Second)
+				switch e.Type {
+				case MsgMoveReview:
+					reviewSeen = true
+				case MsgGameView:
+					v := decode[GameViewPayload](t, e).View
+					if v.Viewer == 0 && v.Current == 0 && v.Phase == engine.PhaseMain && v.Turn > 0 {
+						atOurTurn, turn = true, v.Turn
+					}
+				case MsgError:
+					t.Fatalf("error: %s", e.Payload)
+				}
+			}
+			room.Handle(owner, Envelope{Type: MsgRequestHint})
+			hint := decode[HintPayload](t, waitEnv(t, owner, 5*time.Second, func(e Envelope) bool {
+				return e.Type == MsgHint
+			}))
+			if hint.Analysis == nil || hint.Analysis.Level != ai.Master || len(hint.Analysis.Candidates) == 0 || hint.Turn == 0 {
+				t.Fatalf("bad hint: %+v", hint)
+			}
+			room.Leave(owner, false)
+			h.Shutdown()
+			waitGone(t, h, roomID)
+
+			rooms, err := st.LoadRooms(context.Background())
+			if err != nil || len(rooms) != 1 || rooms[0].Status != "playing" || rooms[0].GameID == 0 {
+				t.Fatalf("persisted room: %v %+v", err, rooms)
+			}
+			rec, err := st.Game(context.Background(), rooms[0].GameID)
+			if err != nil || rec.Status != "playing" || len(rec.Actions) == 0 {
+				t.Fatalf("persisted game: %v %+v", err, rec)
+			}
+			if len(rec.Players) != 2 || rec.Players[1].AILevel != level {
+				t.Fatalf("AI identity was not persisted: %+v", rec.Players)
+			}
+			if rec.Actions[0].Review == nil {
+				t.Fatal("move review was not persisted")
+			}
+			curves, err := st.CurveByGame(context.Background(), rec.ID)
+			if err != nil || len(curves[0]) == 0 {
+				t.Fatalf("curve was not persisted: %v %+v", err, curves)
+			}
+
+			h2 := NewHub(st, DefaultConfig())
+			t.Cleanup(func() { h2.Close() })
+			if err := h2.Restore(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			restored := h2.Get(roomID)
+			if restored == nil || restored.Summary().Status != "playing" {
+				t.Fatalf("room was not restored: %+v", restored)
+			}
+
+			owner2 := NewSession(1, "alice")
+			restored.Join(owner2)
+			rs := decode[RoomState](t, waitEnv(t, owner2, 2*time.Second, func(e Envelope) bool {
+				return e.Type == MsgRoomState && decode[RoomState](t, e).Status == "playing"
+			}))
+			if len(rs.Seats) != 2 || rs.Seats[1].Level != level {
+				t.Fatalf("AI identity was not restored: %+v", rs.Seats)
+			}
+			rv := decode[GameViewPayload](t, waitEnv(t, owner2, 2*time.Second, func(e Envelope) bool {
+				return e.Type == MsgGameView && decode[GameViewPayload](t, e).View.Viewer == 0
+			})).View
+			if rv.Current != 0 || rv.Turn != turn {
+				t.Fatalf("replayed position differs: current=%d turn=%d want turn %d", rv.Current, rv.Turn, turn)
+			}
+			cached := decode[HintPayload](t, waitEnv(t, owner2, 2*time.Second, func(e Envelope) bool {
+				return e.Type == MsgHint
+			}))
+			if cached.Turn != hint.Turn || cached.Analysis == nil || cached.Analysis.Level != ai.Master || len(cached.Analysis.Candidates) == 0 {
+				t.Fatalf("cached hint was not restored: got %+v want turn %d", cached, hint.Turn)
+			}
+		})
+	}
+}
+
+func TestNobleSeatSelectionAndWaitingRestore(t *testing.T) {
 	h, st := testHub(t, 0)
-	room, err := h.Create(1, "alice", RoomSettings{AIs: []string{"medium"}, Hints: boolPtr(true)})
+	room, err := h.Create(1, "alice", RoomSettings{AIs: []string{"noble"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	roomID := room.ID()
 	owner := NewSession(1, "alice")
-	startRoom(t, h, owner, room)
-
-	view := decode[GameViewPayload](t, waitEnv(t, owner, 2*time.Second, func(e Envelope) bool {
-		return e.Type == MsgGameView && decode[GameViewPayload](t, e).View.Current == 0
-	})).View
-	room.Handle(owner, Envelope{Type: MsgAction, Payload: mustJSON(ActionPayload{Action: view.Legal[0]})})
-
-	reviewSeen, atOurTurn := false, false
-	var turn int
-	for !reviewSeen || !atOurTurn {
-		e := readEnv(t, owner, 10*time.Second)
-		switch e.Type {
-		case MsgMoveReview:
-			reviewSeen = true
-		case MsgGameView:
-			v := decode[GameViewPayload](t, e).View
-			if v.Viewer == 0 && v.Current == 0 && v.Phase == engine.PhaseMain && v.Turn > 0 {
-				atOurTurn, turn = true, v.Turn
-			}
-		case MsgError:
-			t.Fatalf("error: %s", e.Payload)
-		}
+	room.Join(owner)
+	rs := decode[RoomState](t, waitEnv(t, owner, 2*time.Second, func(e Envelope) bool { return e.Type == MsgRoomState }))
+	if rs.Seats[1].Level != "noble" || !rs.Hints {
+		t.Fatalf("created room: %+v", rs)
 	}
-	room.Handle(owner, Envelope{Type: MsgRequestHint})
-	hint := decode[HintPayload](t, waitEnv(t, owner, 5*time.Second, func(e Envelope) bool {
-		return e.Type == MsgHint
-	}))
-	if hint.Analysis == nil || hint.Analysis.Level != ai.Master || len(hint.Analysis.Candidates) == 0 || hint.Turn == 0 {
-		t.Fatalf("bad hint: %+v", hint)
+	for _, level := range []string{"medium", "noble"} {
+		room.Handle(owner, Envelope{Type: MsgSetSeat, Payload: mustJSON(SetSeatPayload{Seat: 1, Kind: "ai", Level: level})})
+		waitEnv(t, owner, 2*time.Second, func(e Envelope) bool {
+			return e.Type == MsgRoomState && decode[RoomState](t, e).Seats[1].Level == level
+		})
 	}
-	room.Leave(owner, false)
 	h.Shutdown()
-	waitGone(t, h, roomID)
-
-	rooms, err := st.LoadRooms(context.Background())
-	if err != nil || len(rooms) != 1 || rooms[0].Status != "playing" || rooms[0].GameID == 0 {
-		t.Fatalf("persisted room: %v %+v", err, rooms)
-	}
-	rec, err := st.Game(context.Background(), rooms[0].GameID)
-	if err != nil || rec.Status != "playing" || len(rec.Actions) == 0 {
-		t.Fatalf("persisted game: %v %+v", err, rec)
-	}
-	if rec.Actions[0].Review == nil {
-		t.Fatal("move review was not persisted")
-	}
-	curves, err := st.CurveByGame(context.Background(), rec.ID)
-	if err != nil || len(curves[0]) == 0 {
-		t.Fatalf("curve was not persisted: %v %+v", err, curves)
-	}
-
+	waitGone(t, h, room.ID())
 	h2 := NewHub(st, DefaultConfig())
-	t.Cleanup(func() { h2.Close() })
+	t.Cleanup(h2.Close)
 	if err := h2.Restore(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	restored := h2.Get(roomID)
-	if restored == nil || restored.Summary().Status != "playing" {
-		t.Fatalf("room was not restored: %+v", restored)
+	restored := h2.Get(room.ID())
+	if restored == nil {
+		t.Fatal("waiting room was not restored")
 	}
-
 	owner2 := NewSession(1, "alice")
 	restored.Join(owner2)
-	waitEnv(t, owner2, 2*time.Second, func(e Envelope) bool {
-		return e.Type == MsgRoomState && decode[RoomState](t, e).Status == "playing"
-	})
-	rv := decode[GameViewPayload](t, waitEnv(t, owner2, 2*time.Second, func(e Envelope) bool {
-		return e.Type == MsgGameView && decode[GameViewPayload](t, e).View.Viewer == 0
-	})).View
-	if rv.Current != 0 || rv.Turn != turn {
-		t.Fatalf("replayed position differs: current=%d turn=%d want turn %d", rv.Current, rv.Turn, turn)
-	}
-	cached := decode[HintPayload](t, waitEnv(t, owner2, 2*time.Second, func(e Envelope) bool {
-		return e.Type == MsgHint
-	}))
-	if cached.Turn != hint.Turn || cached.Analysis == nil || cached.Analysis.Level != ai.Master || len(cached.Analysis.Candidates) == 0 {
-		t.Fatalf("cached hint was not restored: got %+v want turn %d", cached, hint.Turn)
+	rs = decode[RoomState](t, waitEnv(t, owner2, 2*time.Second, func(e Envelope) bool { return e.Type == MsgRoomState }))
+	if rs.Status != "waiting" || rs.Seats[1].Level != "noble" {
+		t.Fatalf("restored room: %+v", rs)
 	}
 }
 

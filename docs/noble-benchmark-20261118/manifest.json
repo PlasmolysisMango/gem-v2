@@ -1,0 +1,822 @@
+{
+  "startedAt": "2026-11-18T05:01:52.284490+00:00",
+  "baseCommit": "28aa768c9c4737d3737be416b12baa98825875e2",
+  "binarySHA256": "2f4565747905d0d71c37c1afcf4238a4f0b519c143b21d93094daf9be13c3c8d",
+  "sourceSHA256": {
+    "internal/ai/agent.go": "e84a181949afa0877003501044f690965aea87be276c24a6b02a625dec292d29",
+    "internal/ai/endgame.go": "eb4e806c5307d2ca57e90c59a691e9f238ef4b38760ff2c6cb603be9a49d27a6",
+    "internal/ai/eval.go": "9e8b8a65db24af229baef503c6c0d52f548ddbb659cf1917db281b656d0f2ec5",
+    "internal/ai/explain.go": "111695fce41e0b01b8aecfe105a6fa2ad94f896a239a5b86ad88952040a23bbd",
+    "internal/ai/features.go": "b5613cb16cea6c3736e119a38f44d32e32b60d244cafe014102d235bcaa8f184",
+    "internal/ai/hard.go": "6b2bd3986af23b33eb6bde64917ca9e21074d46a94b946970323442046c45551",
+    "internal/ai/noble.go": "fb7a2239076e1cd423d69eee08c32d6602f6ff8a41adfef8f286bc27cbe69151",
+    "internal/ai/policy.go": "cb86e1e1d805c628e81b034f5f2280b2dee72f8f1318bcdf4add4bd4f24bc709",
+    "internal/ai/review.go": "2ba97f1dc888a4867dbb6d2a1584c6d0b191ef68107b2545fc082b57a66f9ee1",
+    "internal/ai/weights.go": "2f87136ef7ccfc59a1d711c08f8da5a08b80fdb780b928d546bb2f68dfa18e43"
+  },
+  "hardware": {
+    "platform": "Linux-6.6.102-5.3.1.alnx4.x86_64-x86_64-with-glibc2.38",
+    "logicalCPUs": 2,
+    "loadAtStart": [
+      5.458984375,
+      2.7998046875,
+      1.4541015625
+    ]
+  },
+  "design": "one noble vs remaining equal-level opponents; full seat rotation; board seeds repeated across seats and opponent levels",
+  "hardMs": 300,
+  "masterMs": 1500,
+  "workersRequested": 0,
+  "parallel": 1,
+  "calibration": {
+    "path": "/tmp/gem-noble-calibration.jsonl",
+    "games": 2,
+    "seed": 18420,
+    "masterMs": 20,
+    "includedInFormalResults": false
+  },
+  "status": "completed",
+  "cases": [
+    {
+      "name": "noble-vs-easy-2p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=easy",
+        "--players=2",
+        "--games=48",
+        "--seed=202611180200",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        5.458984375,
+        2.7998046875,
+        1.4541015625
+      ],
+      "file": "noble-vs-easy-2p.jsonl.gz",
+      "elapsedSeconds": 0.37654687906615436,
+      "exitCode": 0,
+      "gameLines": 48,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "easy",
+          "players": 2,
+          "games": 48,
+          "baseSeed": 202611180200,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 368788257,
+        "stats": {
+          "games": 48,
+          "requestedGames": 48,
+          "startedGames": 48,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 42,
+          "avgTurns": 57,
+          "avgThinkANs": 86562,
+          "avgThinkBNs": 84105
+        },
+        "winRateA": 0.875
+      },
+      "loadAfter": [
+        5.458984375,
+        2.7998046875,
+        1.4541015625
+      ]
+    },
+    {
+      "name": "noble-vs-easy-3p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=easy",
+        "--players=3",
+        "--games=24",
+        "--seed=202611180300",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        5.458984375,
+        2.7998046875,
+        1.4541015625
+      ],
+      "file": "noble-vs-easy-3p.jsonl.gz",
+      "elapsedSeconds": 0.29262151394505054,
+      "exitCode": 0,
+      "gameLines": 24,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "easy",
+          "players": 3,
+          "games": 24,
+          "baseSeed": 202611180300,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 287103700,
+        "stats": {
+          "games": 24,
+          "requestedGames": 24,
+          "startedGames": 24,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 20,
+          "avgTurns": 82.625,
+          "avgThinkANs": 100887,
+          "avgThinkBNs": 99872
+        },
+        "winRateA": 0.8333333333333334
+      },
+      "loadAfter": [
+        5.458984375,
+        2.7998046875,
+        1.4541015625
+      ]
+    },
+    {
+      "name": "noble-vs-easy-4p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=easy",
+        "--players=4",
+        "--games=24",
+        "--seed=202611180400",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        5.458984375,
+        2.7998046875,
+        1.4541015625
+      ],
+      "file": "noble-vs-easy-4p.jsonl.gz",
+      "elapsedSeconds": 0.5333365190308541,
+      "exitCode": 0,
+      "gameLines": 24,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "easy",
+          "players": 4,
+          "games": 24,
+          "baseSeed": 202611180400,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 527328724,
+        "stats": {
+          "games": 24,
+          "requestedGames": 24,
+          "startedGames": 24,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 23,
+          "avgTurns": 105.16666666666667,
+          "avgThinkANs": 176915,
+          "avgThinkBNs": 143259
+        },
+        "winRateA": 0.9583333333333334
+      },
+      "loadAfter": [
+        5.458984375,
+        2.7998046875,
+        1.4541015625
+      ]
+    },
+    {
+      "name": "noble-vs-medium-2p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=medium",
+        "--players=2",
+        "--games=48",
+        "--seed=202611180200",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        5.458984375,
+        2.7998046875,
+        1.4541015625
+      ],
+      "file": "noble-vs-medium-2p.jsonl.gz",
+      "elapsedSeconds": 0.8442262549651787,
+      "exitCode": 0,
+      "gameLines": 48,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "medium",
+          "players": 2,
+          "games": 48,
+          "baseSeed": 202611180200,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 839421482,
+        "stats": {
+          "games": 48,
+          "requestedGames": 48,
+          "startedGames": 48,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 25,
+          "avgTurns": 67.33333333333333,
+          "avgThinkANs": 36228,
+          "avgThinkBNs": 336680
+        },
+        "winRateA": 0.5208333333333334
+      },
+      "loadAfter": [
+        5.181640625,
+        2.7861328125,
+        1.45751953125
+      ]
+    },
+    {
+      "name": "noble-vs-medium-3p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=medium",
+        "--players=3",
+        "--games=24",
+        "--seed=202611180300",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        5.181640625,
+        2.7861328125,
+        1.45751953125
+      ],
+      "file": "noble-vs-medium-3p.jsonl.gz",
+      "elapsedSeconds": 1.4219862449681386,
+      "exitCode": 0,
+      "gameLines": 24,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "medium",
+          "players": 3,
+          "games": 24,
+          "baseSeed": 202611180300,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 1415817982,
+        "stats": {
+          "games": 24,
+          "requestedGames": 24,
+          "startedGames": 24,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 11,
+          "avgTurns": 87.5,
+          "avgThinkANs": 65773,
+          "avgThinkBNs": 847839
+        },
+        "winRateA": 0.4583333333333333
+      },
+      "loadAfter": [
+        5.181640625,
+        2.7861328125,
+        1.45751953125
+      ]
+    },
+    {
+      "name": "noble-vs-medium-4p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=medium",
+        "--players=4",
+        "--games=24",
+        "--seed=202611180400",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        5.181640625,
+        2.7861328125,
+        1.45751953125
+      ],
+      "file": "noble-vs-medium-4p.jsonl.gz",
+      "elapsedSeconds": 3.9469866019207984,
+      "exitCode": 0,
+      "gameLines": 24,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "medium",
+          "players": 4,
+          "games": 24,
+          "baseSeed": 202611180400,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 3940947277,
+        "stats": {
+          "games": 24,
+          "requestedGames": 24,
+          "startedGames": 24,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 17,
+          "avgTurns": 107.33333333333333,
+          "avgThinkANs": 113263,
+          "avgThinkBNs": 1834907
+        },
+        "winRateA": 0.7083333333333334
+      },
+      "loadAfter": [
+        4.9267578125,
+        2.77294921875,
+        1.46044921875
+      ]
+    },
+    {
+      "name": "noble-vs-hard-2p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=hard",
+        "--players=2",
+        "--games=48",
+        "--seed=202611180200",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        4.9267578125,
+        2.77294921875,
+        1.46044921875
+      ],
+      "file": "noble-vs-hard-2p.jsonl.gz",
+      "elapsedSeconds": 449.15937932697125,
+      "exitCode": 0,
+      "gameLines": 48,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "hard",
+          "players": 2,
+          "games": 48,
+          "baseSeed": 202611180200,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 449154298777,
+        "stats": {
+          "games": 48,
+          "requestedGames": 48,
+          "startedGames": 48,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 8,
+          "avgTurns": 63.041666666666664,
+          "avgThinkANs": 62549,
+          "avgThinkBNs": 268447762
+        },
+        "winRateA": 0.16666666666666666
+      },
+      "loadAfter": [
+        1.7958984375,
+        2.2412109375,
+        1.73583984375
+      ]
+    },
+    {
+      "name": "noble-vs-hard-3p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=hard",
+        "--players=3",
+        "--games=24",
+        "--seed=202611180300",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        1.7958984375,
+        2.2412109375,
+        1.73583984375
+      ],
+      "file": "noble-vs-hard-3p.jsonl.gz",
+      "elapsedSeconds": 413.07580231595784,
+      "exitCode": 0,
+      "gameLines": 24,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "hard",
+          "players": 3,
+          "games": 24,
+          "baseSeed": 202611180300,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 413069951510,
+        "stats": {
+          "games": 24,
+          "requestedGames": 24,
+          "startedGames": 24,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 4,
+          "avgTurns": 86.625,
+          "avgThinkANs": 85164,
+          "avgThinkBNs": 280117930
+        },
+        "winRateA": 0.16666666666666666
+      },
+      "loadAfter": [
+        2.576171875,
+        2.42822265625,
+        1.97607421875
+      ]
+    },
+    {
+      "name": "noble-vs-hard-4p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=hard",
+        "--players=4",
+        "--games=24",
+        "--seed=202611180400",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        2.576171875,
+        2.42822265625,
+        1.97607421875
+      ],
+      "file": "noble-vs-hard-4p.jsonl.gz",
+      "elapsedSeconds": 580.4594038990326,
+      "exitCode": 0,
+      "gameLines": 24,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "hard",
+          "players": 4,
+          "games": 24,
+          "baseSeed": 202611180400,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 580453414319,
+        "stats": {
+          "games": 24,
+          "requestedGames": 24,
+          "startedGames": 24,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 4,
+          "avgTurns": 106.5,
+          "avgThinkANs": 125398,
+          "avgThinkBNs": 284137378
+        },
+        "winRateA": 0.16666666666666666
+      },
+      "loadAfter": [
+        1.8671875,
+        1.9248046875,
+        1.89501953125
+      ]
+    },
+    {
+      "name": "noble-vs-master-2p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=master",
+        "--players=2",
+        "--games=48",
+        "--seed=202611180200",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        1.8671875,
+        1.9248046875,
+        1.89501953125
+      ],
+      "file": "noble-vs-master-2p.jsonl.gz",
+      "elapsedSeconds": 2085.7055363880936,
+      "exitCode": 0,
+      "gameLines": 48,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "master",
+          "players": 2,
+          "games": 48,
+          "baseSeed": 202611180200,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 2085700240909,
+        "stats": {
+          "games": 48,
+          "requestedGames": 48,
+          "startedGames": 48,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 7,
+          "avgTurns": 58.666666666666664,
+          "avgThinkANs": 59267,
+          "avgThinkBNs": 1414824882
+        },
+        "winRateA": 0.14583333333333334
+      },
+      "loadAfter": [
+        1.95166015625,
+        2.115234375,
+        2.15283203125
+      ]
+    },
+    {
+      "name": "noble-vs-master-3p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=master",
+        "--players=3",
+        "--games=24",
+        "--seed=202611180300",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        1.95166015625,
+        2.115234375,
+        2.15283203125
+      ],
+      "file": "noble-vs-master-3p.jsonl.gz",
+      "elapsedSeconds": 2034.642541519017,
+      "exitCode": 0,
+      "gameLines": 24,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "master",
+          "players": 3,
+          "games": 24,
+          "baseSeed": 202611180300,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 2034636223278,
+        "stats": {
+          "games": 24,
+          "requestedGames": 24,
+          "startedGames": 24,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 1,
+          "avgTurns": 86.625,
+          "avgThinkANs": 76365,
+          "avgThinkBNs": 1388703564
+        },
+        "winRateA": 0.041666666666666664
+      },
+      "loadAfter": [
+        2.29443359375,
+        2.48193359375,
+        2.43994140625
+      ]
+    },
+    {
+      "name": "noble-vs-master-4p",
+      "command": [
+        "/tmp/gem-noble-arena-final",
+        "--a=noble",
+        "--b=master",
+        "--players=4",
+        "--games=24",
+        "--seed=202611180400",
+        "--hard-ms=300",
+        "--master-ms=1500",
+        "--workers=0",
+        "--parallel=1",
+        "--jsonl"
+      ],
+      "loadBefore": [
+        2.29443359375,
+        2.48193359375,
+        2.43994140625
+      ],
+      "file": "noble-vs-master-4p.jsonl.gz",
+      "elapsedSeconds": 2858.51493367902,
+      "exitCode": 0,
+      "gameLines": 24,
+      "summary": {
+        "type": "summary",
+        "schemaVersion": 1,
+        "config": {
+          "a": "noble",
+          "b": "master",
+          "players": 4,
+          "games": 24,
+          "baseSeed": 202611180400,
+          "parallel": 1,
+          "hardMs": 300,
+          "masterMs": 1500,
+          "workers": 0,
+          "effectiveMasterWorkers": 2,
+          "hardWorkers": 1,
+          "cpus": 2,
+          "gomaxprocs": 2,
+          "goVersion": "go1.26.3",
+          "agentRng": "unseeded; board seed and recorded actions/events support replay"
+        },
+        "status": "completed",
+        "durationNs": 2858507398760,
+        "stats": {
+          "games": 24,
+          "requestedGames": 24,
+          "startedGames": 24,
+          "failedGames": 0,
+          "cancelledGames": 0,
+          "winsA": 3,
+          "avgTurns": 105.66666666666667,
+          "avgThinkANs": 174549,
+          "avgThinkBNs": 1423429162
+        },
+        "winRateA": 0.125
+      },
+      "loadAfter": [
+        2.6103515625,
+        2.67431640625,
+        2.63916015625
+      ]
+    }
+  ],
+  "finishedAt": "2026-11-18T07:22:21.295858+00:00"
+}

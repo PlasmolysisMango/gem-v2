@@ -330,95 +330,99 @@ func waitRoom(t *testing.T, ctx context.Context, c *websocket.Conn, ok func(Room
 
 // TestFullGameTwoHumansTwoAIs plays a complete 4-player game: 2 humans over WebSocket + 2 AIs.
 func TestFullGameTwoHumansTwoAIs(t *testing.T) {
-	srv, _, _ := newTestServer(t)
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
+	for _, firstAI := range []string{"easy", "noble"} {
+		t.Run(firstAI, func(t *testing.T) {
+			srv, _, _ := newTestServer(t)
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+			defer cancel()
 
-	var alice, bob AuthResponse
-	doJSON(t, "POST", srv.URL+"/api/auth/register", "", credentials{"alice", "secret1"}, &alice)
-	doJSON(t, "POST", srv.URL+"/api/auth/register", "", credentials{"bob_2", "secret2"}, &bob)
+			var alice, bob AuthResponse
+			doJSON(t, "POST", srv.URL+"/api/auth/register", "", credentials{"alice", "secret1"}, &alice)
+			doJSON(t, "POST", srv.URL+"/api/auth/register", "", credentials{"bob_2", "secret2"}, &bob)
 
-	hints := true
-	var room RoomSummary
-	if c := doJSON(t, "POST", srv.URL+"/api/rooms", alice.Token, RoomSettings{Name: "测试房", Seats: 4, AIs: []string{"easy", "medium"}, Hints: &hints}, &room); c != 201 {
-		t.Fatalf("create room: %d", c)
-	}
-	var rooms []RoomSummary
-	doJSON(t, "GET", srv.URL+"/api/rooms", bob.Token, nil, &rooms)
-	if len(rooms) != 1 || rooms[0].Open != 1 || rooms[0].AIs != 2 {
-		t.Fatalf("lobby: %+v", rooms)
-	}
+			hints := true
+			var room RoomSummary
+			if c := doJSON(t, "POST", srv.URL+"/api/rooms", alice.Token, RoomSettings{Name: "测试房", Seats: 4, AIs: []string{firstAI, "medium"}, Hints: &hints}, &room); c != 201 {
+				t.Fatalf("create room: %d", c)
+			}
+			var rooms []RoomSummary
+			doJSON(t, "GET", srv.URL+"/api/rooms", bob.Token, nil, &rooms)
+			if len(rooms) != 1 || rooms[0].Open != 1 || rooms[0].AIs != 2 {
+				t.Fatalf("lobby: %+v", rooms)
+			}
 
-	a := &wsClient{t: t, name: "alice", c: dial(t, ctx, srv, alice.Token), room: room.ID, wantHint: true}
-	b := &wsClient{t: t, name: "bob", c: dial(t, ctx, srv, bob.Token), room: room.ID}
-	a.send(ctx, game.MsgJoinRoom, nil)
-	waitRoom(t, ctx, a.c, func(rs RoomState) bool { return rs.YourSeat == 0 })
-	b.send(ctx, game.MsgJoinRoom, nil)
-	rs := waitRoom(t, ctx, b.c, func(rs RoomState) bool { return rs.YourSeat >= 0 })
-	if rs.YourSeat != 3 || rs.Seats[1].Kind != game.SeatAI {
-		t.Fatalf("unexpected seating: %+v", rs)
-	}
-	// Non-owner cannot start.
-	b.send(ctx, game.MsgStart, nil)
-	for {
-		var e Envelope
-		wsjson.Read(ctx, b.c, &e)
-		if e.Type == game.MsgError {
-			break
-		}
-	}
-	waitRoom(t, ctx, a.c, func(rs RoomState) bool { return rs.Seats[3].Connected })
-	a.send(ctx, game.MsgStart, nil)
-
-	done := make(chan error, 2)
-	go a.run(ctx, done)
-	go b.run(ctx, done)
-	for i := 0; i < 2; i++ {
-		if err := <-done; err != nil {
-			t.Fatal(err)
-		}
-	}
-	if a.hint == nil {
-		t.Fatal("alice never received a hint")
-	}
-	if a.over.GameID == 0 || len(a.over.Points) != 4 || len(a.over.Winners) == 0 {
-		t.Fatalf("bad game over: %+v", a.over)
-	}
-	t.Logf("game %d finished: points %v winners %v, alice moves %d (reviews %d), bob moves %d", a.over.GameID, a.over.Points, a.over.Winners, a.moves, len(a.over.Reviews), b.moves)
-
-	// The stored record replays to the same result.
-	var rec replay.Replay
-	if c := doJSON(t, "GET", fmt.Sprintf("%s/api/games/%d", srv.URL, a.over.GameID), bob.Token, nil, &rec); c != 200 {
-		t.Fatalf("game record: %d", c)
-	}
-	if rec.Status != "finished" || len(rec.Players) != 4 || rec.Players[1].AILevel != "easy" || len(rec.Frames) == 0 {
-		t.Fatalf("record: %+v", rec.Game)
-	}
-	for _, frame := range rec.Frames {
-		if len(frame.Events) == 0 || frame.Events[0].Kind != "action" || frame.Events[0].Seat != frame.Seat {
-			t.Fatalf("回放缺少结构化行动事件：%+v", frame)
-		}
-		for _, event := range frame.Events {
-			if event.Kind == "action" && (event.Action.Type == engine.ActBuy || event.Action.Type == engine.ActBuyReserved) {
-				if event.Card != event.Action.Card || event.Card < 0 {
-					t.Fatalf("购买事件缺少卡牌信息：%+v", event)
+			a := &wsClient{t: t, name: "alice", c: dial(t, ctx, srv, alice.Token), room: room.ID, wantHint: true}
+			b := &wsClient{t: t, name: "bob", c: dial(t, ctx, srv, bob.Token), room: room.ID}
+			a.send(ctx, game.MsgJoinRoom, nil)
+			waitRoom(t, ctx, a.c, func(rs RoomState) bool { return rs.YourSeat == 0 })
+			b.send(ctx, game.MsgJoinRoom, nil)
+			rs := waitRoom(t, ctx, b.c, func(rs RoomState) bool { return rs.YourSeat >= 0 })
+			if rs.YourSeat != 3 || rs.Seats[1].Kind != game.SeatAI {
+				t.Fatalf("unexpected seating: %+v", rs)
+			}
+			// Non-owner cannot start.
+			b.send(ctx, game.MsgStart, nil)
+			for {
+				var e Envelope
+				wsjson.Read(ctx, b.c, &e)
+				if e.Type == game.MsgError {
+					break
 				}
 			}
-		}
-	}
-	last := rec.Frames[len(rec.Frames)-1].View
-	if last.Phase != engine.PhaseOver {
-		t.Fatalf("replay did not reach the end (%d frames)", len(rec.Frames))
-	}
-	for i, p := range a.over.Points {
-		if last.Players[i].Points != p || *rec.Players[i].FinalPoints != p {
-			t.Fatalf("replay mismatch seat %d", i)
-		}
-	}
-	var st store.Stats
-	doJSON(t, "GET", fmt.Sprintf("%s/api/users/%d/stats", srv.URL, alice.User.ID), bob.Token, nil, &st)
-	if st.Games != 1 || len(st.Recent) != 1 {
-		t.Fatalf("stats: %+v", st)
+			waitRoom(t, ctx, a.c, func(rs RoomState) bool { return rs.Seats[3].Connected })
+			a.send(ctx, game.MsgStart, nil)
+
+			done := make(chan error, 2)
+			go a.run(ctx, done)
+			go b.run(ctx, done)
+			for i := 0; i < 2; i++ {
+				if err := <-done; err != nil {
+					t.Fatal(err)
+				}
+			}
+			if a.hint == nil {
+				t.Fatal("alice never received a hint")
+			}
+			if a.over.GameID == 0 || len(a.over.Points) != 4 || len(a.over.Winners) == 0 {
+				t.Fatalf("bad game over: %+v", a.over)
+			}
+			t.Logf("game %d finished: points %v winners %v, alice moves %d (reviews %d), bob moves %d", a.over.GameID, a.over.Points, a.over.Winners, a.moves, len(a.over.Reviews), b.moves)
+
+			// The stored record replays to the same result.
+			var rec replay.Replay
+			if c := doJSON(t, "GET", fmt.Sprintf("%s/api/games/%d", srv.URL, a.over.GameID), bob.Token, nil, &rec); c != 200 {
+				t.Fatalf("game record: %d", c)
+			}
+			if rec.Status != "finished" || len(rec.Players) != 4 || rec.Players[1].AILevel != firstAI || len(rec.Frames) == 0 {
+				t.Fatalf("record: %+v", rec.Game)
+			}
+			for _, frame := range rec.Frames {
+				if len(frame.Events) == 0 || frame.Events[0].Kind != "action" || frame.Events[0].Seat != frame.Seat {
+					t.Fatalf("回放缺少结构化行动事件：%+v", frame)
+				}
+				for _, event := range frame.Events {
+					if event.Kind == "action" && (event.Action.Type == engine.ActBuy || event.Action.Type == engine.ActBuyReserved) {
+						if event.Card != event.Action.Card || event.Card < 0 {
+							t.Fatalf("购买事件缺少卡牌信息：%+v", event)
+						}
+					}
+				}
+			}
+			last := rec.Frames[len(rec.Frames)-1].View
+			if last.Phase != engine.PhaseOver {
+				t.Fatalf("replay did not reach the end (%d frames)", len(rec.Frames))
+			}
+			for i, p := range a.over.Points {
+				if last.Players[i].Points != p || *rec.Players[i].FinalPoints != p {
+					t.Fatalf("replay mismatch seat %d", i)
+				}
+			}
+			var st store.Stats
+			doJSON(t, "GET", fmt.Sprintf("%s/api/users/%d/stats", srv.URL, alice.User.ID), bob.Token, nil, &st)
+			if st.Games != 1 || len(st.Recent) != 1 {
+				t.Fatalf("stats: %+v", st)
+			}
+		})
 	}
 }
 

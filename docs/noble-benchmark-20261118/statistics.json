@@ -1,0 +1,1310 @@
+[
+  {
+    "level": "easy",
+    "players": 2,
+    "games": 48,
+    "independentBoards": 24,
+    "wins": 42,
+    "ties": 0,
+    "losses": 6,
+    "credit": 42,
+    "winRate": 0.875,
+    "baseline": 0.5,
+    "pointsA": 15.083333333333334,
+    "pointsB": 8.395833333333334,
+    "noblesA": 1.0625,
+    "noblesB": 0.14583333333333334,
+    "cardPointsA": 11.895833333333334,
+    "cardPointsB": 7.958333333333333,
+    "levelsA": [
+      9.604166666666666,
+      4.229166666666667,
+      0.8541666666666666
+    ],
+    "levelsB": [
+      7.104166666666667,
+      3.1666666666666665,
+      0.4375
+    ],
+    "rounds": 28.5,
+    "turns": 57,
+    "gameSeconds": 0.0076549911666666665,
+    "batchSeconds": 0.368788257,
+    "thinkAMs": 0.08656229876060012,
+    "thinkBMs": 0.08410510152621102,
+    "thinkCallsA": 1533,
+    "thinkCallsB": 1507,
+    "unchangedA": 63,
+    "unchangedB": 19,
+    "primaryA": 1368,
+    "primaryB": 1368,
+    "repeatedA": 4,
+    "repeatedB": 5,
+    "repeatedGames": 2,
+    "roundCaps": 0,
+    "naturalGames": 48,
+    "naturalWinRate": 0.875,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.046052631578947366,
+    "unchangedRateB": 0.013888888888888888,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 144,
+      "printedMean": 3.4444444444444446,
+      "paidMean": 2.9027777777777777,
+      "mixed": 110,
+      "cost3": 80,
+      "mixed4": 64,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 0,
+        "seed": 202611180200,
+        "seatA": 0,
+        "points": [
+          18,
+          10
+        ],
+        "nobles": [
+          3,
+          0
+        ],
+        "rounds": 27,
+        "levelsA": [
+          11,
+          6,
+          0
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 2,
+        "seed": 202611180201,
+        "seatA": 0,
+        "points": [
+          10,
+          17
+        ],
+        "nobles": [
+          0,
+          1
+        ],
+        "rounds": 39,
+        "levelsA": [
+          4,
+          2,
+          1
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "easy",
+    "players": 3,
+    "games": 24,
+    "independentBoards": 8,
+    "wins": 20,
+    "ties": 0,
+    "losses": 4,
+    "credit": 20,
+    "winRate": 0.8333333333333334,
+    "baseline": 0.3333333333333333,
+    "pointsA": 15.583333333333334,
+    "pointsB": 7.979166666666667,
+    "noblesA": 1.75,
+    "noblesB": 0.1875,
+    "cardPointsA": 10.333333333333334,
+    "cardPointsB": 7.416666666666667,
+    "levelsA": [
+      11.416666666666666,
+      3.7083333333333335,
+      0.5833333333333334
+    ],
+    "levelsB": [
+      6.854166666666667,
+      3.5208333333333335,
+      0.2708333333333333
+    ],
+    "rounds": 27.541666666666668,
+    "turns": 82.625,
+    "gameSeconds": 0.011807167458333333,
+    "batchSeconds": 0.2871037,
+    "thinkAMs": 0.10088711576011157,
+    "thinkBMs": 0.09987242153413088,
+    "thinkCallsA": 717,
+    "thinkCallsB": 1421,
+    "unchangedA": 3,
+    "unchangedB": 10,
+    "primaryA": 661,
+    "primaryB": 1322,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 24,
+    "naturalWinRate": 0.8333333333333334,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.0045385779122541605,
+    "unchangedRateB": 0.007564296520423601,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 72,
+      "printedMean": 3.3055555555555554,
+      "paidMean": 2.7916666666666665,
+      "mixed": 52,
+      "cost3": 50,
+      "mixed4": 22,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 0,
+        "seed": 202611180300,
+        "seatA": 0,
+        "points": [
+          15,
+          7,
+          5
+        ],
+        "nobles": [
+          2,
+          0,
+          0
+        ],
+        "rounds": 23,
+        "levelsA": [
+          11,
+          2,
+          1
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 9,
+        "seed": 202611180303,
+        "seatA": 0,
+        "points": [
+          8,
+          16,
+          8
+        ],
+        "nobles": [
+          0,
+          0,
+          1
+        ],
+        "rounds": 29,
+        "levelsA": [
+          8,
+          4,
+          0
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "easy",
+    "players": 4,
+    "games": 24,
+    "independentBoards": 6,
+    "wins": 23,
+    "ties": 0,
+    "losses": 1,
+    "credit": 23,
+    "winRate": 0.9583333333333334,
+    "baseline": 0.25,
+    "pointsA": 15.666666666666666,
+    "pointsB": 6.916666666666667,
+    "noblesA": 1.75,
+    "noblesB": 0.05555555555555555,
+    "cardPointsA": 10.416666666666666,
+    "cardPointsB": 6.75,
+    "levelsA": [
+      11.25,
+      3.1666666666666665,
+      0.875
+    ],
+    "levelsB": [
+      6.097222222222222,
+      2.2777777777777777,
+      0.4444444444444444
+    ],
+    "rounds": 26.291666666666668,
+    "turns": 105.16666666666667,
+    "gameSeconds": 0.021843461833333334,
+    "batchSeconds": 0.527328724,
+    "thinkAMs": 0.17691575519287833,
+    "thinkBMs": 0.14325948003757633,
+    "thinkCallsA": 674,
+    "thinkCallsB": 2129,
+    "unchangedA": 2,
+    "unchangedB": 27,
+    "primaryA": 631,
+    "primaryB": 1893,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 24,
+    "naturalWinRate": 0.9583333333333334,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.003169572107765452,
+    "unchangedRateB": 0.014263074484944533,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 72,
+      "printedMean": 3.25,
+      "paidMean": 2.7777777777777777,
+      "mixed": 46,
+      "cost3": 54,
+      "mixed4": 18,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 0,
+        "seed": 202611180400,
+        "seatA": 0,
+        "points": [
+          17,
+          8,
+          10,
+          7
+        ],
+        "nobles": [
+          2,
+          0,
+          0,
+          0
+        ],
+        "rounds": 26,
+        "levelsA": [
+          12,
+          3,
+          2
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 22,
+        "seed": 202611180405,
+        "seatA": 2,
+        "points": [
+          12,
+          17,
+          5,
+          4
+        ],
+        "nobles": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "rounds": 30,
+        "levelsA": [
+          13,
+          2,
+          0
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "medium",
+    "players": 2,
+    "games": 48,
+    "independentBoards": 24,
+    "wins": 25,
+    "ties": 0,
+    "losses": 23,
+    "credit": 25,
+    "winRate": 0.5208333333333334,
+    "baseline": 0.5,
+    "pointsA": 12.020833333333334,
+    "pointsB": 13.145833333333334,
+    "noblesA": 0.75,
+    "noblesB": 0.22916666666666666,
+    "cardPointsA": 9.770833333333334,
+    "cardPointsB": 12.458333333333334,
+    "levelsA": [
+      9.375,
+      2.7291666666666665,
+      1
+    ],
+    "levelsB": [
+      4.208333333333333,
+      5.291666666666667,
+      0.5208333333333334
+    ],
+    "rounds": 33.666666666666664,
+    "turns": 67.33333333333333,
+    "gameSeconds": 0.017415269625,
+    "batchSeconds": 0.839421482,
+    "thinkAMs": 0.036228864608076006,
+    "thinkBMs": 0.33668061260803256,
+    "thinkCallsA": 2105,
+    "thinkCallsB": 1967,
+    "unchangedA": 374,
+    "unchangedB": 275,
+    "primaryA": 1616,
+    "primaryB": 1616,
+    "repeatedA": 272,
+    "repeatedB": 271,
+    "repeatedGames": 4,
+    "roundCaps": 3,
+    "naturalGames": 45,
+    "naturalWinRate": 0.5555555555555556,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.23143564356435645,
+    "unchangedRateB": 0.17017326732673269,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 138,
+      "printedMean": 3.4347826086956523,
+      "paidMean": 2.927536231884058,
+      "mixed": 104,
+      "cost3": 78,
+      "mixed4": 59,
+      "mono4": 1,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 0,
+        "seed": 202611180200,
+        "seatA": 0,
+        "points": [
+          16,
+          14
+        ],
+        "nobles": [
+          0,
+          0
+        ],
+        "rounds": 30,
+        "levelsA": [
+          11,
+          6,
+          1
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 1,
+        "seed": 202611180200,
+        "seatA": 1,
+        "points": [
+          17,
+          6
+        ],
+        "nobles": [
+          0,
+          0
+        ],
+        "rounds": 30,
+        "levelsA": [
+          11,
+          3,
+          0
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "medium",
+    "players": 3,
+    "games": 24,
+    "independentBoards": 8,
+    "wins": 11,
+    "ties": 0,
+    "losses": 13,
+    "credit": 11,
+    "winRate": 0.4583333333333333,
+    "baseline": 0.3333333333333333,
+    "pointsA": 13.166666666666666,
+    "pointsB": 12.5,
+    "noblesA": 1.0833333333333333,
+    "noblesB": 0.2708333333333333,
+    "cardPointsA": 9.916666666666666,
+    "cardPointsB": 11.6875,
+    "levelsA": [
+      10.75,
+      3.5833333333333335,
+      0.7916666666666666
+    ],
+    "levelsB": [
+      4.479166666666667,
+      4.979166666666667,
+      0.5416666666666666
+    ],
+    "rounds": 29.166666666666668,
+    "turns": 87.5,
+    "gameSeconds": 0.058962032625,
+    "batchSeconds": 1.415817982,
+    "thinkAMs": 0.06577339002557545,
+    "thinkBMs": 0.8478394652371669,
+    "thinkCallsA": 782,
+    "thinkCallsB": 1539,
+    "unchangedA": 15,
+    "unchangedB": 17,
+    "primaryA": 700,
+    "primaryB": 1400,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 24,
+    "naturalWinRate": 0.4583333333333333,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.02142857142857143,
+    "unchangedRateB": 0.012142857142857143,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 72,
+      "printedMean": 3.375,
+      "paidMean": 2.8194444444444446,
+      "mixed": 49,
+      "cost3": 45,
+      "mixed4": 27,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 3,
+        "seed": 202611180301,
+        "seatA": 0,
+        "points": [
+          17,
+          13,
+          7
+        ],
+        "nobles": [
+          4,
+          0,
+          0
+        ],
+        "rounds": 27,
+        "levelsA": [
+          15,
+          2,
+          1
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 0,
+        "seed": 202611180300,
+        "seatA": 0,
+        "points": [
+          10,
+          17,
+          9
+        ],
+        "nobles": [
+          1,
+          1,
+          0
+        ],
+        "rounds": 30,
+        "levelsA": [
+          14,
+          1,
+          1
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "medium",
+    "players": 4,
+    "games": 24,
+    "independentBoards": 6,
+    "wins": 17,
+    "ties": 0,
+    "losses": 7,
+    "credit": 17,
+    "winRate": 0.7083333333333334,
+    "baseline": 0.25,
+    "pointsA": 14.833333333333334,
+    "pointsB": 11.458333333333334,
+    "noblesA": 1.5833333333333333,
+    "noblesB": 0.08333333333333333,
+    "cardPointsA": 10.083333333333334,
+    "cardPointsB": 11.208333333333334,
+    "levelsA": [
+      10.75,
+      3.5,
+      0.875
+    ],
+    "levelsB": [
+      4.291666666666667,
+      4.111111111111111,
+      0.7083333333333334
+    ],
+    "rounds": 26.833333333333332,
+    "turns": 107.33333333333333,
+    "gameSeconds": 0.16417334645833334,
+    "batchSeconds": 3.940947277,
+    "thinkAMs": 0.11326346197991392,
+    "thinkBMs": 1.8349077437774526,
+    "thinkCallsA": 697,
+    "thinkCallsB": 2049,
+    "unchangedA": 3,
+    "unchangedB": 7,
+    "primaryA": 644,
+    "primaryB": 1932,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 24,
+    "naturalWinRate": 0.7083333333333334,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.004658385093167702,
+    "unchangedRateB": 0.0036231884057971015,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 72,
+      "printedMean": 3.3333333333333335,
+      "paidMean": 2.7083333333333335,
+      "mixed": 42,
+      "cost3": 48,
+      "mixed4": 24,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 0,
+        "seed": 202611180400,
+        "seatA": 0,
+        "points": [
+          15,
+          7,
+          10,
+          9
+        ],
+        "nobles": [
+          3,
+          0,
+          0,
+          0
+        ],
+        "rounds": 25,
+        "levelsA": [
+          15,
+          2,
+          1
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 4,
+        "seed": 202611180401,
+        "seatA": 0,
+        "points": [
+          6,
+          10,
+          16,
+          9
+        ],
+        "nobles": [
+          0,
+          0,
+          1,
+          0
+        ],
+        "rounds": 26,
+        "levelsA": [
+          7,
+          2,
+          0
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "hard",
+    "players": 2,
+    "games": 48,
+    "independentBoards": 24,
+    "wins": 8,
+    "ties": 0,
+    "losses": 40,
+    "credit": 8,
+    "winRate": 0.16666666666666666,
+    "baseline": 0.5,
+    "pointsA": 12.625,
+    "pointsB": 15.916666666666666,
+    "noblesA": 0.7916666666666666,
+    "noblesB": 0.3333333333333333,
+    "cardPointsA": 10.25,
+    "cardPointsB": 14.916666666666666,
+    "levelsA": [
+      10.458333333333334,
+      3.5,
+      0.875
+    ],
+    "levelsB": [
+      4.979166666666667,
+      4.520833333333333,
+      1.3333333333333333
+    ],
+    "rounds": 31.520833333333332,
+    "turns": 63.041666666666664,
+    "gameSeconds": 9.357366283395834,
+    "batchSeconds": 449.154298777,
+    "thinkAMs": 0.06254951583710408,
+    "thinkBMs": 268.4477624126794,
+    "thinkCallsA": 1768,
+    "thinkCallsB": 1672,
+    "unchangedA": 144,
+    "unchangedB": 97,
+    "primaryA": 1513,
+    "primaryB": 1513,
+    "repeatedA": 94,
+    "repeatedB": 94,
+    "repeatedGames": 2,
+    "roundCaps": 1,
+    "naturalGames": 47,
+    "naturalWinRate": 0.1702127659574468,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.09517514871116986,
+    "unchangedRateB": 0.06411103767349637,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 142,
+      "printedMean": 3.359154929577465,
+      "paidMean": 2.9014084507042255,
+      "mixed": 98,
+      "cost3": 91,
+      "mixed4": 51,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 4,
+        "seed": 202611180202,
+        "seatA": 0,
+        "points": [
+          16,
+          12
+        ],
+        "nobles": [
+          3,
+          0
+        ],
+        "rounds": 27,
+        "levelsA": [
+          18,
+          0,
+          1
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 0,
+        "seed": 202611180200,
+        "seatA": 0,
+        "points": [
+          14,
+          15
+        ],
+        "nobles": [
+          3,
+          0
+        ],
+        "rounds": 27,
+        "levelsA": [
+          11,
+          4,
+          0
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "hard",
+    "players": 3,
+    "games": 24,
+    "independentBoards": 8,
+    "wins": 4,
+    "ties": 0,
+    "losses": 20,
+    "credit": 4,
+    "winRate": 0.16666666666666666,
+    "baseline": 0.3333333333333333,
+    "pointsA": 11.875,
+    "pointsB": 14.541666666666666,
+    "noblesA": 1.0416666666666667,
+    "noblesB": 0.3125,
+    "cardPointsA": 8.75,
+    "cardPointsB": 13.604166666666666,
+    "levelsA": [
+      10.458333333333334,
+      3.5416666666666665,
+      0.6666666666666666
+    ],
+    "levelsB": [
+      4.770833333333333,
+      4.395833333333333,
+      1.125
+    ],
+    "rounds": 28.875,
+    "turns": 86.625,
+    "gameSeconds": 17.211220245375,
+    "batchSeconds": 413.06995151,
+    "thinkAMs": 0.08516423901808785,
+    "thinkBMs": 280.1179305678426,
+    "thinkCallsA": 774,
+    "thinkCallsB": 1474,
+    "unchangedA": 18,
+    "unchangedB": 7,
+    "primaryA": 693,
+    "primaryB": 1386,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 24,
+    "naturalWinRate": 0.16666666666666666,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.025974025974025976,
+    "unchangedRateB": 0.005050505050505051,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 72,
+      "printedMean": 3.361111111111111,
+      "paidMean": 2.9027777777777777,
+      "mixed": 53,
+      "cost3": 46,
+      "mixed4": 26,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 5,
+        "seed": 202611180301,
+        "seatA": 2,
+        "points": [
+          15,
+          16,
+          17
+        ],
+        "nobles": [
+          1,
+          0,
+          2
+        ],
+        "rounds": 30,
+        "levelsA": [
+          12,
+          5,
+          1
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 0,
+        "seed": 202611180300,
+        "seatA": 0,
+        "points": [
+          9,
+          16,
+          13
+        ],
+        "nobles": [
+          0,
+          1,
+          0
+        ],
+        "rounds": 27,
+        "levelsA": [
+          8,
+          6,
+          0
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "hard",
+    "players": 4,
+    "games": 24,
+    "independentBoards": 6,
+    "wins": 4,
+    "ties": 0,
+    "losses": 20,
+    "credit": 4,
+    "winRate": 0.16666666666666666,
+    "baseline": 0.25,
+    "pointsA": 12.5,
+    "pointsB": 13.291666666666666,
+    "noblesA": 1.25,
+    "noblesB": 0.16666666666666666,
+    "cardPointsA": 8.75,
+    "cardPointsB": 12.791666666666666,
+    "levelsA": [
+      11.75,
+      3.375,
+      0.6666666666666666
+    ],
+    "levelsB": [
+      3.5972222222222223,
+      4.180555555555555,
+      0.9027777777777778
+    ],
+    "rounds": 26.625,
+    "turns": 106.5,
+    "gameSeconds": 24.185528004208333,
+    "batchSeconds": 580.453414319,
+    "thinkAMs": 0.12539847432024168,
+    "thinkBMs": 284.13737889226246,
+    "thinkCallsA": 662,
+    "thinkCallsB": 2042,
+    "unchangedA": 0,
+    "unchangedB": 2,
+    "primaryA": 639,
+    "primaryB": 1917,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 24,
+    "naturalWinRate": 0.16666666666666666,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.0,
+    "unchangedRateB": 0.0010432968179447052,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 72,
+      "printedMean": 3.4027777777777777,
+      "paidMean": 2.7222222222222223,
+      "mixed": 50,
+      "cost3": 43,
+      "mixed4": 29,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 1,
+        "seed": 202611180400,
+        "seatA": 1,
+        "points": [
+          14,
+          16,
+          12,
+          15
+        ],
+        "nobles": [
+          1,
+          2,
+          0,
+          0
+        ],
+        "rounds": 27,
+        "levelsA": [
+          12,
+          3,
+          1
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 0,
+        "seed": 202611180400,
+        "seatA": 0,
+        "points": [
+          10,
+          18,
+          10,
+          14
+        ],
+        "nobles": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "rounds": 25,
+        "levelsA": [
+          8,
+          3,
+          1
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "master",
+    "players": 2,
+    "games": 48,
+    "independentBoards": 24,
+    "wins": 7,
+    "ties": 0,
+    "losses": 41,
+    "credit": 7,
+    "winRate": 0.14583333333333334,
+    "baseline": 0.5,
+    "pointsA": 12.0625,
+    "pointsB": 16,
+    "noblesA": 0.8125,
+    "noblesB": 0.22916666666666666,
+    "cardPointsA": 9.625,
+    "cardPointsB": 15.3125,
+    "levelsA": [
+      9.875,
+      3.7708333333333335,
+      0.6875
+    ],
+    "levelsB": [
+      4.541666666666667,
+      4.75,
+      1.2291666666666667
+    ],
+    "rounds": 29.333333333333332,
+    "turns": 58.666666666666664,
+    "gameSeconds": 43.45207538429167,
+    "batchSeconds": 2085.700240909,
+    "thinkAMs": 0.059267167082294264,
+    "thinkBMs": 1414.82488245251,
+    "thinkCallsA": 1604,
+    "thinkCallsB": 1474,
+    "unchangedA": 59,
+    "unchangedB": 1,
+    "primaryA": 1408,
+    "primaryB": 1408,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 48,
+    "naturalWinRate": 0.14583333333333334,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.04190340909090909,
+    "unchangedRateB": 0.0007102272727272727,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 143,
+      "printedMean": 3.3916083916083917,
+      "paidMean": 2.902097902097902,
+      "mixed": 102,
+      "cost3": 87,
+      "mixed4": 56,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 4,
+        "seed": 202611180202,
+        "seatA": 0,
+        "points": [
+          16,
+          11
+        ],
+        "nobles": [
+          2,
+          0
+        ],
+        "rounds": 29,
+        "levelsA": [
+          14,
+          2,
+          2
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 0,
+        "seed": 202611180200,
+        "seatA": 0,
+        "points": [
+          17,
+          18
+        ],
+        "nobles": [
+          3,
+          0
+        ],
+        "rounds": 28,
+        "levelsA": [
+          11,
+          6,
+          0
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "master",
+    "players": 3,
+    "games": 24,
+    "independentBoards": 8,
+    "wins": 1,
+    "ties": 0,
+    "losses": 23,
+    "credit": 1,
+    "winRate": 0.041666666666666664,
+    "baseline": 0.3333333333333333,
+    "pointsA": 8.708333333333334,
+    "pointsB": 13.708333333333334,
+    "noblesA": 0.4166666666666667,
+    "noblesB": 0.2708333333333333,
+    "cardPointsA": 7.458333333333333,
+    "cardPointsB": 12.895833333333334,
+    "levelsA": [
+      9.125,
+      2.5833333333333335,
+      0.625
+    ],
+    "levelsB": [
+      4.770833333333333,
+      4.541666666666667,
+      0.8958333333333334
+    ],
+    "rounds": 28.875,
+    "turns": 86.625,
+    "gameSeconds": 84.77648179366666,
+    "batchSeconds": 2034.636223278,
+    "thinkAMs": 0.0763653985419198,
+    "thinkBMs": 1388.7035647440273,
+    "thinkCallsA": 823,
+    "thinkCallsB": 1465,
+    "unchangedA": 41,
+    "unchangedB": 1,
+    "primaryA": 693,
+    "primaryB": 1386,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 24,
+    "naturalWinRate": 0.041666666666666664,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.05916305916305916,
+    "unchangedRateB": 0.0007215007215007215,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 72,
+      "printedMean": 3.361111111111111,
+      "paidMean": 2.875,
+      "mixed": 48,
+      "cost3": 46,
+      "mixed4": 26,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 22,
+        "seed": 202611180307,
+        "seatA": 1,
+        "points": [
+          13,
+          15,
+          12
+        ],
+        "nobles": [
+          0,
+          1,
+          0
+        ],
+        "rounds": 27,
+        "levelsA": [
+          8,
+          6,
+          0
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 0,
+        "seed": 202611180300,
+        "seatA": 0,
+        "points": [
+          9,
+          14,
+          20
+        ],
+        "nobles": [
+          0,
+          0,
+          2
+        ],
+        "rounds": 35,
+        "levelsA": [
+          9,
+          1,
+          2
+        ],
+        "roundCap": false
+      }
+    ]
+  },
+  {
+    "level": "master",
+    "players": 4,
+    "games": 24,
+    "independentBoards": 6,
+    "wins": 3,
+    "ties": 0,
+    "losses": 21,
+    "credit": 3,
+    "winRate": 0.125,
+    "baseline": 0.25,
+    "pointsA": 12.291666666666666,
+    "pointsB": 13.652777777777779,
+    "noblesA": 1.0416666666666667,
+    "noblesB": 0.08333333333333333,
+    "cardPointsA": 9.166666666666666,
+    "cardPointsB": 13.402777777777779,
+    "levelsA": [
+      10.916666666666666,
+      3.2916666666666665,
+      0.8333333333333334
+    ],
+    "levelsB": [
+      3,
+      4.680555555555555,
+      0.8611111111111112
+    ],
+    "rounds": 26.416666666666668,
+    "turns": 105.66666666666667,
+    "gameSeconds": 119.10444879945834,
+    "batchSeconds": 2858.50739876,
+    "thinkAMs": 0.17454911177347243,
+    "thinkBMs": 1423.429162750996,
+    "thinkCallsA": 671,
+    "thinkCallsB": 2008,
+    "unchangedA": 0,
+    "unchangedB": 2,
+    "primaryA": 634,
+    "primaryB": 1902,
+    "repeatedA": 0,
+    "repeatedB": 0,
+    "repeatedGames": 0,
+    "roundCaps": 0,
+    "naturalGames": 24,
+    "naturalWinRate": 0.125,
+    "capWinCredit": 0,
+    "unchangedRateA": 0.0,
+    "unchangedRateB": 0.0010515247108307045,
+    "errors": 0,
+    "cancelled": 0,
+    "early": {
+      "count": 72,
+      "printedMean": 3.3472222222222223,
+      "paidMean": 2.6944444444444446,
+      "mixed": 47,
+      "cost3": 47,
+      "mixed4": 25,
+      "mono4": 0,
+      "cost5": 0
+    },
+    "examples": [
+      {
+        "outcome": "胜",
+        "g": 9,
+        "seed": 202611180402,
+        "seatA": 1,
+        "points": [
+          12,
+          16,
+          13,
+          15
+        ],
+        "nobles": [
+          0,
+          1,
+          0,
+          0
+        ],
+        "rounds": 28,
+        "levelsA": [
+          12,
+          3,
+          2
+        ],
+        "roundCap": false
+      },
+      {
+        "outcome": "负",
+        "g": 0,
+        "seed": 202611180400,
+        "seatA": 0,
+        "points": [
+          16,
+          15,
+          15,
+          17
+        ],
+        "nobles": [
+          1,
+          0,
+          0,
+          0
+        ],
+        "rounds": 26,
+        "levelsA": [
+          13,
+          2,
+          3
+        ],
+        "roundCap": false
+      }
+    ]
+  }
+]

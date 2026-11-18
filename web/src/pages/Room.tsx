@@ -266,6 +266,9 @@ function WaitingRoom({ room, isOwner, onLeave }: { room: RoomState; isOwner: boo
                 <option value="ai:medium">AI · 中等</option>
                 <option value="ai:hard">AI · 困难</option>
                 <option value="ai:master">AI · 大师</option>
+                <optgroup label="独立策略">
+                  <option value="ai:noble">AI · 基建贵族</option>
+                </optgroup>
               </select>
             )}
           </div>

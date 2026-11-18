@@ -93,7 +93,7 @@ func NewHub(st *store.Store, cfg Config) *Hub {
 
 func (h *Hub) HintBudget() time.Duration { return h.cfg.HintBudget }
 
-var ErrSettings = errors.New("房间设置无效：座位数 2-4，AI 难度为 easy/medium/hard")
+var ErrSettings = errors.New("房间设置无效：座位数 2-4，AI 类型为 easy/medium/hard/master/noble")
 
 // Create opens a room owned by the user; seat 0 is reserved for the owner and the
 // requested AIs fill the following seats.

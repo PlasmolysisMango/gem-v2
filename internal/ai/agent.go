@@ -17,12 +17,14 @@ const (
 	Medium Level = "medium"
 	Hard   Level = "hard"
 	Master Level = "master"
+	// Noble is a standalone strategy, not another ordered difficulty.
+	Noble Level = "noble"
 )
 
 // ParseLevel validates a level string.
 func ParseLevel(s string) (Level, bool) {
 	switch Level(s) {
-	case Easy, Medium, Hard, Master:
+	case Easy, Medium, Hard, Master, Noble:
 		return Level(s), true
 	}
 	return "", false
@@ -39,6 +41,8 @@ func (l Level) Name() string {
 		return "困难"
 	case Master:
 		return "大师"
+	case Noble:
+		return "基建贵族"
 	}
 	return string(l)
 }
@@ -94,6 +98,8 @@ func New(l Level) Agent {
 		return NewMedium()
 	case Hard:
 		return NewHard(300 * time.Millisecond)
+	case Noble:
+		return NewNoble()
 	default:
 		return NewMaster(1500 * time.Millisecond)
 	}

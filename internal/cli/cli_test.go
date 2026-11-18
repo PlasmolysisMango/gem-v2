@@ -230,6 +230,21 @@ func TestOfflineGame(t *testing.T) {
 	}
 }
 
+func TestOfflineNobleGame(t *testing.T) {
+	o, err := NewOffline([]ai.Level{ai.Level("noble")}, 1842, 30*time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	o.Delay, o.Review = 0, false
+	t.Cleanup(o.Close)
+	ch := make(chan tea.Msg, 4096)
+	o.Start(func(msg tea.Msg) { ch <- msg })
+	over := drive(t, o, ch, false)
+	if len(over.Points) != 2 || len(over.Winners) == 0 {
+		t.Fatalf("bad result %+v", over)
+	}
+}
+
 func TestOnlineGame(t *testing.T) {
 	st, err := store.Open(":memory:")
 	if err != nil {

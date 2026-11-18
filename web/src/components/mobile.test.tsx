@@ -64,6 +64,8 @@ describe('手机端组件结构', () => {
       expect(html).toMatch(new RegExp(`<button[^>]*>${label}</button>`))
     }
     expect(select).toContain('<option value="master" selected="">AI · 大师</option>')
+    expect(select).toContain('<optgroup label="独立策略"><option value="noble">AI · 基建贵族</option></optgroup>')
+    expect(html).not.toMatch(/<button[^>]*>基建贵族<\/button>/)
   })
 
   it('等待房间每个可配置座位均提供四档 AI，支持大师座位显示和选中', () => {
@@ -92,9 +94,34 @@ describe('手机端组件结构', () => {
         for (const [level, label] of levels) {
           expect(select).toMatch(new RegExp(`<option value="ai:${level}"(?: selected="")?>AI · ${label}</option>`))
         }
+        expect(select).toContain('<optgroup label="独立策略"><option value="ai:noble">AI · 基建贵族</option></optgroup>')
       }
       expect(selects[2]).toContain('<option value="ai:master" selected="">AI · 大师</option>')
       expect(html).toMatch(/<span[^>]*>AI · 大师<\/span>/)
+    } finally {
+      authSpy.mockRestore()
+      gameSpy.mockRestore()
+    }
+  })
+
+  it('等待房间独立策略保持选中并显示中文名', () => {
+    const state = gameStore.useGame.getState()
+    const room: RoomState = {
+      id: 'NOBLE', name: '基建贵族练习', ownerId: 1, ownerName: '房主', status: 'waiting', hints: true,
+      turnSeconds: 0, yourSeat: 0, spectators: 0,
+      seats: [
+        { index: 0, kind: 'human', userId: 1, name: '房主', connected: true },
+        { index: 1, kind: 'ai', name: '', level: 'noble', connected: true },
+      ],
+    }
+    const gameSpy = vi.spyOn(gameStore, 'useGame')
+    const authSpy = vi.spyOn(authStore, 'useAuth')
+    try {
+      gameSpy.mockReturnValue({ ...state, room, view: null })
+      authSpy.mockReturnValue({ id: 1, username: '房主', isAdmin: false, createdAt: '' })
+      const html = renderToStaticMarkup(<StaticRouter location="/room/NOBLE"><Room /></StaticRouter>)
+      expect(html).toContain('<optgroup label="独立策略"><option value="ai:noble" selected="">AI · 基建贵族</option></optgroup>')
+      expect(html).toMatch(/<span[^>]*>AI · 基建贵族<\/span>/)
     } finally {
       authSpy.mockRestore()
       gameSpy.mockRestore()

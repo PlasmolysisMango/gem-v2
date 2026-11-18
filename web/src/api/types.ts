@@ -82,7 +82,7 @@ export interface Envelope<T = unknown> {
 }
 
 export type SeatKind = 'open' | 'closed' | 'human' | 'ai'
-export type AILevel = 'easy' | 'medium' | 'hard' | 'master'
+export type AILevel = 'easy' | 'medium' | 'hard' | 'master' | 'noble'
 
 export interface SeatInfo {
   index: number

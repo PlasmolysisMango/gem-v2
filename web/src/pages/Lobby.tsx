@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api/http'
 import type { AILevel, RoomSummary } from '../api/types'
 
-export const LEVEL_NAME: Record<AILevel, string> = { easy: '简单', medium: '中等', hard: '困难', master: '大师' }
+export const LEVEL_NAME: Record<AILevel, string> = { easy: '简单', medium: '中等', hard: '困难', master: '大师', noble: '基建贵族' }
 const STATUS_NAME: Record<string, string> = { waiting: '等待中', playing: '对局中', finished: '已结束' }
 
 type SeatChoice = 'human' | AILevel
@@ -175,6 +175,9 @@ export default function Lobby() {
                   <option value="medium">AI · 中等</option>
                   <option value="hard">AI · 困难</option>
                   <option value="master">AI · 大师</option>
+                  <optgroup label="独立策略">
+                    <option value="noble">AI · 基建贵族</option>
+                  </optgroup>
                 </select>
               </div>
             ))}

@@ -405,7 +405,7 @@ func (r *Room) setSeat(s *Session, p SetSeatPayload) string {
 	case SeatAI:
 		lv, ok := ai.ParseLevel(p.Level)
 		if !ok {
-			return "AI 难度无效"
+			return "AI 类型无效"
 		}
 		*st = seat{kind: SeatAI, level: lv}
 	default:

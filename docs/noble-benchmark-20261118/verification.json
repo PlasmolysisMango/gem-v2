@@ -1,0 +1,48 @@
+{
+  "date": "2026-11-18",
+  "logs": { "goRegressionAndSeparateCalibration": "go-regression-and-calibration.log", "frontendRegression": "frontend-regression.log" },
+  "strategyTests": { "command": "go test ./internal/ai -run TestNoble -count=1", "passed": true, "testFunctions": 54 },
+  "go": {
+    "fullSuite": { "command": "go test ./...", "passed": true },
+    "race": { "command": "go test -race ./internal/ai ./internal/arena ./internal/game", "passed": true },
+    "vet": { "command": "go vet ./...", "passed": true }
+  },
+  "frontend": {
+    "tests": { "command": "pnpm test", "passed": true, "count": 44 },
+    "build": { "command": "pnpm build", "typeCheckPassed": true, "productionBuildPassed": true, "javascript": "index-DcM2giad.js" }
+  },
+  "browser": {
+    "backend": "isolated database, not production",
+    "frontend": "production-build preview",
+    "desktop": [1440, 1000],
+    "mobile": [390, 844],
+    "defaultOpponent": "master",
+    "originalQuickButtons": 4,
+    "independentGroup": "独立策略",
+    "creation": true,
+    "seatChange": ["noble", "medium", "noble"],
+    "humanMoveAndAIReply": true,
+    "purchase": { "gameId": 6, "card": 36, "legalPreparatoryActions": 2, "displayedPaymentMatched": true, "purchaseButtonUsed": true, "paid": [0, 2, 1, 0, 0, 0], "tokensBefore": [2, 2, 2, 0, 0, 0], "tokensAfter": [2, 0, 1, 0, 0, 0], "nCardsBefore": 0, "nCardsAfter": 1, "bonusIncrementVerified": true, "consoleExceptions": [] },
+    "hintLevel": "master",
+    "restoration": { "gameId": 2, "turn": 2, "level": "noble", "cachedHintLevel": "master", "sameBeforeAndAfterRestart": true },
+    "historyName": "基建贵族",
+    "replayName": "基建贵族",
+    "replayControlIcons": true,
+    "replayFinalFrameNavigation": true,
+    "mobileHorizontalOverflow": false,
+    "consoleExceptions": [],
+    "developmentModeLimitation": "Existing StrictMode join/leave/join cycle can explicitly close an owner-only waiting room; no room lifecycle change made in this task."
+  },
+  "isolatedCompleteGames": [
+    { "players": 2, "gameId": 3, "opponentLevels": ["noble"], "humanMoves": 27, "frames": 55, "points": [7, 16], "winners": [1], "cachedReplayAnalysisLevel": "master" },
+    { "players": 3, "gameId": 4, "opponentLevels": ["noble", "medium"], "humanMoves": 34, "frames": 113, "points": [11, 8, 19], "winners": [2], "cachedReplayAnalysisLevel": "master" }
+  ],
+  "cli": {
+    "helpIncludesNoble": true,
+    "offline": { "opponents": ["noble", "medium"], "humanMove": "take white/blue/green", "bothAIRepliesObserved": true, "observedRound": 2 },
+    "online": { "opponents": ["noble", "medium"], "waitingNamesCorrect": true, "started": true, "humanMove": "take white/blue/green", "bothAIRepliesObserved": true, "observedRound": 2 }
+  },
+  "formalReplayAudit": { "receipts": "replay-audit.jsonl", "auditSource": "evidence-audit.go.txt", "checks": ["legal actions and recorded events", "real payments", "public fingerprints", "terminal non-timing metrics", "noble masked-state deterministic decisions", "unchanged input and nil analysis"], "timingExcluded": true },
+  "finalCompletionAudit": { "formalGames": 384, "combinations": 12, "replayedDecisions": 33557, "nobleDecisionChecks": 12810, "frozenSourcesAndBinaryMatch": true, "originalSharedAIModulesUnchanged": true, "sameBoardsAcrossSeatRotationsAndOpponents": true, "roundCaps": 4, "errors": 0, "cancelled": 0, "screenshots": 9, "report": "../noble-ai-report-20261118.md" },
+  "boundaries": { "originalFourAlgorithmsAndBudgetsUnchanged": true, "productionDatabaseUsed": false, "committed": false, "pushed": false, "deployed": false, "source2ReadOrModified": false }
+}

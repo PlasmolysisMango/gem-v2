@@ -1,0 +1,18 @@
+ok  	gem/cmd/gem-arena	0.034s
+ok  	gem/cmd/gem-cli	(cached)
+?   	gem/cmd/gem-server	[no test files]
+ok  	gem/internal/ai	9.070s
+ok  	gem/internal/api	12.598s
+ok  	gem/internal/arena	(cached)
+ok  	gem/internal/auth	(cached)
+ok  	gem/internal/cli	9.883s
+ok  	gem/internal/engine	(cached)
+?   	gem/internal/entryauth	[no test files]
+ok  	gem/internal/game	2.662s
+ok  	gem/internal/replay	(cached)
+ok  	gem/internal/store	(cached)
+?   	gem/web	[no test files]
+ok  	gem/internal/ai	23.371s
+ok  	gem/internal/arena	(cached)
+ok  	gem/internal/game	4.325s
+game 1/2  noble win rate 0.0%game 2/2  noble win rate 0.0%

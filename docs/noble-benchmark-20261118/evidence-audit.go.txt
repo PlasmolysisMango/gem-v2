@@ -1,0 +1,140 @@
+package main
+
+import (
+	"bytes"
+	"compress/gzip"
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"reflect"
+
+	"gem/internal/ai"
+	"gem/internal/arena"
+	"gem/internal/engine"
+)
+
+type replayAgent struct {
+	level     ai.Level
+	decisions []arena.DecisionRecord
+	cursor    int
+	checked   int
+	failure   error
+}
+
+func (a *replayAgent) Level() ai.Level { return a.level }
+func (a *replayAgent) Choose(ctx context.Context, m *engine.GameState, seat int) (engine.Action, *ai.Analysis) {
+	if a.cursor >= len(a.decisions) {
+		a.failure = fmt.Errorf("recorded decisions exhausted")
+		return engine.Action{}, nil
+	}
+	d := a.decisions[a.cursor]
+	a.cursor++
+	if d.Phase != m.Phase || !d.Applied {
+		a.failure = fmt.Errorf("phase or applied flag differs at decision %d", a.cursor)
+	}
+	if a.level == ai.Noble {
+		before := *m
+		chosen, analysis := ai.NewNoble().Choose(ctx, m, seat)
+		if chosen != d.Action || analysis != nil || !reflect.DeepEqual(before, *m) {
+			a.failure = fmt.Errorf("noble decision or input invariant differs at decision %d", a.cursor)
+		}
+		a.checked++
+	}
+	return d.Action, nil
+}
+
+func audit(path string) error {
+	compressed, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	stream, err := gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		return err
+	}
+	defer stream.Close()
+	decoder := json.NewDecoder(stream)
+	games, decisions, checks, summaries := 0, 0, 0, 0
+	for {
+		var line struct {
+			Type   string `json:"type"`
+			Status string `json:"status"`
+			arena.GameRecord
+		}
+		if err := decoder.Decode(&line); err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+		if line.Type == "summary" {
+			if line.Status != "completed" {
+				return fmt.Errorf("batch incomplete")
+			}
+			summaries++
+			continue
+		}
+		if line.Type != "game" {
+			return fmt.Errorf("unexpected record type %q", line.Type)
+		}
+		agents := make([]ai.Agent, len(line.Labels))
+		for seat, label := range line.Labels {
+			level, ok := ai.ParseLevel(label)
+			if !ok {
+				return fmt.Errorf("invalid recorded agent %q", label)
+			}
+			a := &replayAgent{level: level}
+			for _, turn := range line.Result.Evidence {
+				if turn.Seat == seat {
+					a.decisions = append(a.decisions, turn.Decisions...)
+				}
+			}
+			agents[seat] = a
+		}
+		replayed, err := arena.PlayRecorded(context.Background(), agents, line.Seed)
+		if err != nil {
+			return fmt.Errorf("g=%d: %w", line.G, err)
+		}
+		for seat, agent := range agents {
+			a := agent.(*replayAgent)
+			if a.failure != nil || a.cursor != len(a.decisions) {
+				return fmt.Errorf("g=%d seat=%d cursor=%d/%d: %v", line.G, seat, a.cursor, len(a.decisions), a.failure)
+			}
+			decisions += a.cursor
+			checks += a.checked
+		}
+		line.Result.Think, line.Result.Duration = replayed.Think, replayed.Duration
+		want, err := json.Marshal(line.Result)
+		if err != nil {
+			return err
+		}
+		got, err := json.Marshal(replayed)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(want, got) {
+			return fmt.Errorf("g=%d: replay events, fingerprints, or terminal metrics differ", line.G)
+		}
+		games++
+	}
+	if summaries != 1 || games != 24 && games != 48 {
+		return fmt.Errorf("incomplete file: games=%d summaries=%d", games, summaries)
+	}
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{
+		"file": filepath.Base(path), "sha256": fmt.Sprintf("%x", sha256.Sum256(compressed)),
+		"games": games, "decisions": decisions, "nobleDeterministicChecks": checks,
+		"engineReplayPassed": true, "timingExcludedFromReplayComparison": true,
+	})
+}
+
+func main() {
+	for _, path := range os.Args[1:] {
+		if err := audit(path); err != nil {
+			fmt.Fprintln(os.Stderr, path, err)
+			os.Exit(1)
+		}
+	}
+}
