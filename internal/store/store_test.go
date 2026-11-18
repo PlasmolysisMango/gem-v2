@@ -27,7 +27,7 @@ func TestStoreRoundTrip(t *testing.T) {
 		t.Fatalf("want ErrNotFound, got %v", err)
 	}
 	seed := uint64(1) << 62
-	gid, err := st.CreateGame(ctx, "ROOM01", seed, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "hard"}})
+	gid, err := st.CreateGame(ctx, "ROOM01", seed, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "hard"}}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestStoreRoundTrip(t *testing.T) {
 	}
 
 	// Games orphaned by a restart are aborted; finished games are untouched.
-	gid2, err := st.CreateGame(ctx, "ROOM02", 7, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "easy"}})
+	gid2, err := st.CreateGame(ctx, "ROOM02", 7, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "easy"}}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,14 @@ func TestReplayAnalysisSurvivesReopen(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
-	gid, err := st.CreateGame(ctx, "REPLAY", 7, []GamePlayer{{Seat: 0, AILevel: "easy"}, {Seat: 1, AILevel: "medium"}})
+	gid, err := st.CreateGame(ctx, "REPLAY", 7, []GamePlayer{{Seat: 0, AILevel: "easy"}, {Seat: 1, AILevel: "medium"}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.FinishGame(ctx, gid, "finished", []int{15, 0}, []int{0}); err != nil {
+		t.Fatal(err)
+	}
+	lease, err := st.BeginReplayExecution(ctx, "reopen-test", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +95,7 @@ func TestReplayAnalysisSurvivesReopen(t *testing.T) {
 		if err := st.AddAction(ctx, gid, seq, 0, `{}`); err != nil {
 			t.Fatal(err)
 		}
-		if err := st.SaveReplayAnalysis(ctx, gid, 0, seq, seq+1, `{"level":"master"}`, `{"verdict":"best"}`, 0.4, 0.5); err != nil {
+		if err := st.SaveReplayAnalysis(ctx, gid, 0, seq, seq+1, `{"level":"master"}`, `{"verdict":"best"}`, 0.4, 0.5, lease); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -156,7 +163,7 @@ func TestRoomsAdminSettingsHintsCurves(t *testing.T) {
 		t.Fatalf("setting: %q %v %v", v, ok, err)
 	}
 
-	gid, err := st.CreateGame(ctx, "ROOMAA", 42, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "medium"}})
+	gid, err := st.CreateGame(ctx, "ROOMAA", 42, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "medium"}}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +219,7 @@ func TestRoomsAdminSettingsHintsCurves(t *testing.T) {
 	}
 
 	// Orphaned games are aborted; the game owned by a persisted room survives.
-	orphan, err := st.CreateGame(ctx, "ROOMBB", 7, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "easy"}})
+	orphan, err := st.CreateGame(ctx, "ROOMBB", 7, []GamePlayer{{Seat: 0, UserID: &u.ID}, {Seat: 1, AILevel: "easy"}}, true)
 	if err != nil {
 		t.Fatal(err)
 	}

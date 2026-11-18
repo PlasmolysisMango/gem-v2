@@ -18,16 +18,18 @@ import (
 // short heuristic rollout and evaluates the leaf. Near the end of the game a paranoid
 // look-ahead over sampled worlds vetoes moves that lose by force.
 type HardAgent struct {
-	level        Level
-	E            *Evaluator
-	Budget       time.Duration
-	Workers      int
-	MaxIter      int // per worker; 0 = time-limited only
-	TopK         int
-	RolloutDepth int // extra plies per player after the leaf
-	C            float64
-	PriorTemp    float64
-	EndgameAt    int // max score that triggers endgame search
+	level  Level
+	E      *Evaluator
+	Budget time.Duration
+	// Concurrent-safe search budget hook; it must not cancel the review context.
+	SearchExpired func() bool
+	Workers       int
+	MaxIter       int // per worker; 0 = time-limited only
+	TopK          int
+	RolloutDepth  int // extra plies per player after the leaf
+	C             float64
+	PriorTemp     float64
+	EndgameAt     int // max score that triggers endgame search
 }
 
 func NewHard(budget time.Duration) *HardAgent {
@@ -43,6 +45,13 @@ func NewMaster(budget time.Duration) *HardAgent {
 }
 
 func (h *HardAgent) Level() Level { return h.level }
+
+func (h *HardAgent) searchExpired(deadline time.Time) bool {
+	if h.SearchExpired != nil {
+		return h.SearchExpired()
+	}
+	return time.Now().After(deadline)
+}
 
 type node struct {
 	action   engine.Action
@@ -109,10 +118,13 @@ func isLegal(s *engine.GameState, a engine.Action) bool {
 }
 
 // iterate runs one ISMCTS iteration on a fresh determinization s.
-func (wk *worker) iterate(root *node, s *engine.GameState, values *[4]float64) {
+func (wk *worker) iterate(ctx context.Context, root *node, s *engine.GameState, values *[4]float64) bool {
 	h := wk.h
 	nd := root
 	for !s.Over() {
+		if ctx.Err() != nil {
+			return false
+		}
 		if s.Phase != engine.PhaseMain {
 			h.E.resolvePending(s)
 			continue
@@ -165,22 +177,32 @@ func (wk *worker) iterate(root *node, s *engine.GameState, values *[4]float64) {
 		s.Step(best.action)
 		nd = best
 	}
-	wk.rollout(s, values)
+	if !wk.rollout(ctx, s, values) {
+		return false
+	}
 	for x := nd; x != nil; x = x.parent {
 		x.n++
 		if x.player >= 0 {
 			x.w += values[x.player]
 		}
 	}
+	return true
 }
 
-// rollout plays a few heuristic plies and then estimates win probabilities.
-func (wk *worker) rollout(s *engine.GameState, values *[4]float64) {
+// Only context cancellation interrupts a rollout, never search-budget expiry.
+func (wk *worker) rollout(ctx context.Context, s *engine.GameState, values *[4]float64) bool {
 	plies := wk.h.RolloutDepth * int(s.NPlayers)
 	for i := 0; i < plies && !s.Over(); i++ {
+		if ctx.Err() != nil {
+			return false
+		}
 		s.Step(wk.h.E.policyAction(s, wk.rng, 0.1, wk.buf))
 	}
+	if ctx.Err() != nil {
+		return false
+	}
 	wk.h.E.WinProbs(s, values)
+	return ctx.Err() == nil
 }
 
 type rootStat struct {
@@ -203,14 +225,16 @@ func (h *HardAgent) search(ctx context.Context, m *engine.GameState, deadline ti
 			roots[i] = root
 			var vals [4]float64
 			for it := 0; ; it++ {
-				if h.MaxIter > 0 && it >= h.MaxIter {
+				if ctx.Err() != nil || (h.MaxIter > 0 && it >= h.MaxIter) {
 					break
 				}
-				if it&7 == 0 && (ctx.Err() != nil || time.Now().After(deadline)) && it > 0 {
+				if it&7 == 0 && it > 0 && h.searchExpired(deadline) {
 					break
 				}
 				s := engine.Determinize(m, wk.rng)
-				wk.iterate(root, &s, &vals)
+				if !wk.iterate(ctx, root, &s, &vals) {
+					break
+				}
 				iters[i]++
 			}
 		}(i)
@@ -270,41 +294,55 @@ func maxPoints(s *engine.GameState) int {
 // Choose implements Agent.
 func (h *HardAgent) Choose(ctx context.Context, m *engine.GameState, seat int) (engine.Action, *Analysis) {
 	an := h.Analyze(ctx, m, seat, false)
+	if ctx.Err() != nil || len(an.Candidates) == 0 {
+		return engine.Action{}, an
+	}
 	return an.Candidates[0].Action, an
 }
 
-// Analyze searches the position and returns ranked candidates. With explain set,
-// candidates carry human-readable reasons and a strategy label.
+// Cancellation returns no candidates after all search goroutines stop.
 func (h *HardAgent) Analyze(ctx context.Context, m *engine.GameState, seat int, explain bool) *Analysis {
 	start := time.Now()
 	an := &Analysis{Seat: seat, Level: h.Level()}
+	defer func() {
+		an.ElapsedMs = time.Since(start).Milliseconds()
+		if ctx.Err() != nil {
+			an.Candidates = nil
+			an.WinRate = 0
+		}
+	}()
+	if ctx.Err() != nil {
+		return an
+	}
 	rng := newRNG()
 	if m.Phase != engine.PhaseMain {
 		s := engine.Determinize(m, rng)
 		acts := s.LegalActions(nil)
 		r := h.E.rankActions(&s, acts)
 		for i := 0; i < len(r) && i < 3; i++ {
+			if ctx.Err() != nil {
+				return an
+			}
 			ns := s
 			ns.Step(r[i].a)
 			an.Candidates = append(an.Candidates, Candidate{Action: r[i].a, Text: engine.Describe(r[i].a),
 				WinRate: h.E.WinProb(&ns, seat), Reasons: []Reason{}, PV: []PVStep{}})
 		}
 		an.WinRate = an.Candidates[0].WinRate
-		if explain {
+		if explain && ctx.Err() == nil {
 			h.explain(m, seat, an)
 		}
-		an.ElapsedMs = time.Since(start).Milliseconds()
 		return an
 	}
 	deadline := start.Add(h.Budget)
-	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
-		deadline = d
-	}
 	acts := m.LegalActions(nil)
+	if ctx.Err() != nil {
+		return an
+	}
 	if len(acts) == 1 {
 		an.Candidates = []Candidate{{Action: acts[0], Text: engine.Describe(acts[0]), WinRate: h.E.WinProb(m, seat), Reasons: []Reason{}, PV: []PVStep{}}}
 		an.WinRate = an.Candidates[0].WinRate
-		if explain {
+		if explain && ctx.Err() == nil {
 			h.explain(m, seat, an)
 		}
 		return an
@@ -316,6 +354,9 @@ func (h *HardAgent) Analyze(ctx context.Context, m *engine.GameState, seat int, 
 		an.Endgame = true
 		s := engine.Determinize(m, rng)
 		ranked := h.E.rankActions(&s, s.LegalActions(nil))
+		if ctx.Err() != nil {
+			return an
+		}
 		if len(ranked) > 12 {
 			ranked = ranked[:12]
 		}
@@ -336,6 +377,9 @@ func (h *HardAgent) Analyze(ctx context.Context, m *engine.GameState, seat int, 
 	stats, iters := h.search(ctx, m, deadline, max(1, workers))
 	egWG.Wait()
 	an.Iterations = iters
+	if ctx.Err() != nil {
+		return an
+	}
 
 	// Combine tree statistics with the endgame verdicts.
 	type cand struct {
@@ -390,38 +434,55 @@ func (h *HardAgent) Analyze(ctx context.Context, m *engine.GameState, seat int, 
 		}
 		an.Candidates = append(an.Candidates, c)
 	}
+	if ctx.Err() != nil {
+		return an
+	}
 	if len(an.Candidates) == 0 {
 		a := h.E.rankActions(m, acts)[0].a
 		an.Candidates = []Candidate{{Action: a, Text: engine.Describe(a), WinRate: h.E.WinProb(m, seat), Reasons: []Reason{}, PV: []PVStep{}}}
 	}
 	an.WinRate = an.Candidates[0].WinRate
-	if explain {
+	if explain && ctx.Err() == nil {
 		h.explain(m, seat, an)
 	}
-	an.ElapsedMs = time.Since(start).Milliseconds()
 	return an
 }
 
-// EstimateActions compares moves with common random rollouts from seat's perspective.
-// It is used to grade a played move against the recommended one.
-func (h *HardAgent) EstimateActions(m *engine.GameState, seat int, acts []engine.Action, samples int) []float64 {
+// Canceled estimates are discarded; search-budget expiry does not apply.
+func (h *HardAgent) EstimateActions(ctx context.Context, m *engine.GameState, seat int, acts []engine.Action, samples int) []float64 {
+	if ctx.Err() != nil {
+		return nil
+	}
 	out := make([]float64, len(acts))
 	seed := rand.Uint64()
 	wk := &worker{h: h}
 	var vals [4]float64
 	for i, a := range acts {
+		if ctx.Err() != nil {
+			return nil
+		}
 		wk.rng = rand.New(rand.NewPCG(seed, 7))
 		for k := 0; k < samples; k++ {
+			if ctx.Err() != nil {
+				return nil
+			}
 			s := engine.Determinize(m, wk.rng)
 			if s.Validate(a) != nil {
 				continue
 			}
 			s.Step(a)
 			h.E.resolvePending(&s)
-			wk.rollout(&s, &vals)
+			if !wk.rollout(ctx, &s, &vals) {
+				return nil
+			}
 			out[i] += vals[seat]
 		}
-		out[i] /= float64(samples)
+		if samples > 0 {
+			out[i] /= float64(samples)
+		}
+	}
+	if ctx.Err() != nil {
+		return nil
 	}
 	return out
 }

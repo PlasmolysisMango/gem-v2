@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Action, Card, Gems, MoveEvent, RoomState, View } from '../api/types'
 import { ALL_COLORS } from '../api/types'
 import {
@@ -110,6 +110,7 @@ export function GameBoard({
   moveEvents,
   moves,
   moveHistory,
+  playerFooter,
 }: {
   view: View
   room: RoomState | null
@@ -119,6 +120,7 @@ export function GameBoard({
   moveEvents?: MoveEvent[]
   moves?: Map<number, string>
   moveHistory?: Map<number, MoveEvent[]>
+  playerFooter?: ReactNode
 }) {
   const me = view.viewer >= 0 ? view.players[view.viewer] : null
   const legal = onAct && view.current === view.viewer ? (view.legal ?? []) : []
@@ -371,6 +373,7 @@ export function GameBoard({
             onInspectReserved={seat === view.viewer ? inspectMyReserved : undefined} />
         ))}
       </section>
+      {playerFooter != null && <div className="min-w-0 xl:hidden">{playerFooter}</div>}
       {/* 横屏保留我方信息与预留购买；竖屏资源统一放在上面的 2×2 玩家栏。 */}
       <section aria-label={me ? '我方信息' : '观战信息'} className="min-w-0 space-y-2 xl:col-span-3 xl:row-start-2">
         {me && (

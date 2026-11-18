@@ -27,7 +27,8 @@ var (
 
 // Store wraps the database.
 type Store struct {
-	db *sql.DB
+	db   *sql.DB
+	path string
 }
 
 // Open opens (or creates) the database at path and applies migrations.
@@ -43,7 +44,7 @@ func Open(path string) (*Store, error) {
 	}
 	// SQLite allows one writer; a single connection also keeps :memory: databases shared.
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db}
+	s := &Store{db: db, path: path}
 	if err := s.migrate(context.Background()); err != nil {
 		db.Close()
 		return nil, err
@@ -220,27 +221,28 @@ type GameAction struct {
 
 // Game is a recorded game.
 type Game struct {
-	ID          int64        `json:"id"`
-	RoomID      string       `json:"roomId"`
-	Seed        uint64       `json:"seed,string"`
-	PlayerCount int          `json:"playerCount"`
-	Status      string       `json:"status"`
-	StartedAt   int64        `json:"startedAt"`
-	EndedAt     *int64       `json:"endedAt"`
-	WinnerSeat  *int         `json:"winnerSeat"`
-	Players     []GamePlayer `json:"players"`
-	Actions     []GameAction `json:"actions,omitempty"`
+	ID           int64        `json:"id"`
+	RoomID       string       `json:"roomId"`
+	Seed         uint64       `json:"seed,string"`
+	PlayerCount  int          `json:"playerCount"`
+	Status       string       `json:"status"`
+	StartedAt    int64        `json:"startedAt"`
+	EndedAt      *int64       `json:"endedAt"`
+	WinnerSeat   *int         `json:"winnerSeat"`
+	HintsEnabled *bool        `json:"hintsEnabled"`
+	Players      []GamePlayer `json:"players"`
+	Actions      []GameAction `json:"actions,omitempty"`
 }
 
 // CreateGame records the start of a game.
-func (s *Store) CreateGame(ctx context.Context, roomID string, seed uint64, players []GamePlayer) (int64, error) {
+func (s *Store) CreateGame(ctx context.Context, roomID string, seed uint64, players []GamePlayer, hintsEnabled bool) (int64, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
 	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `INSERT INTO games (room_id, seed, player_count, status, started_at) VALUES (?, ?, ?, 'playing', ?)`,
-		roomID, int64(seed), len(players), time.Now().Unix())
+	res, err := tx.ExecContext(ctx, `INSERT INTO games (room_id, seed, player_count, status, started_at, hints_enabled) VALUES (?, ?, ?, 'playing', ?, ?)`,
+		roomID, int64(seed), len(players), time.Now().Unix(), hintsEnabled)
 	if err != nil {
 		return 0, err
 	}
@@ -313,6 +315,13 @@ func (s *Store) FinishGame(ctx context.Context, gameID int64, status string, poi
 			return err
 		}
 	}
+	if status == "finished" {
+		if _, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO replay_jobs(game_id)
+			SELECT id FROM games WHERE id = ? AND hints_enabled = 0
+			AND EXISTS (SELECT 1 FROM game_players WHERE game_id = games.id AND user_id IS NOT NULL)`, gameID); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -349,10 +358,14 @@ func scanGame(sc interface{ Scan(...any) error }) (Game, error) {
 	var seed int64
 	var ended sql.NullInt64
 	var winner sql.NullInt64
-	if err := sc.Scan(&g.ID, &g.RoomID, &seed, &g.PlayerCount, &g.Status, &g.StartedAt, &ended, &winner); err != nil {
+	var hints sql.NullBool
+	if err := sc.Scan(&g.ID, &g.RoomID, &seed, &g.PlayerCount, &g.Status, &g.StartedAt, &ended, &winner, &hints); err != nil {
 		return g, err
 	}
 	g.Seed = uint64(seed)
+	if hints.Valid {
+		g.HintsEnabled = &hints.Bool
+	}
 	if ended.Valid {
 		v := ended.Int64
 		g.EndedAt = &v
@@ -364,7 +377,7 @@ func scanGame(sc interface{ Scan(...any) error }) (Game, error) {
 	return g, nil
 }
 
-const gameCols = `g.id, g.room_id, g.seed, g.player_count, g.status, g.started_at, g.ended_at, g.winner_seat`
+const gameCols = `g.id, g.room_id, g.seed, g.player_count, g.status, g.started_at, g.ended_at, g.winner_seat, g.hints_enabled`
 
 // Game loads a game with players and actions.
 func (s *Store) Game(ctx context.Context, id int64) (Game, error) {

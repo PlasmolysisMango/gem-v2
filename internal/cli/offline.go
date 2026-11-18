@@ -220,10 +220,13 @@ func (o *Offline) reviewMove(before *engine.GameState, turn int, played engine.A
 		return
 	}
 	an := o.analysis(before, turn, false)
-	if an == nil || len(an.Candidates) == 0 {
+	if o.ctx.Err() != nil || an == nil || len(an.Candidates) == 0 {
 		return
 	}
-	r := o.coach.Review(before, 0, an, played)
+	r := o.coach.Review(o.ctx, before, 0, an, played)
+	if o.ctx.Err() != nil {
+		return
+	}
 	o.reviews = append(o.reviews, r)
 	if o.ctx.Err() == nil {
 		o.send(ReviewMsg{Review: r})

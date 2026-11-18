@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"context"
 	"fmt"
 
 	"gem/internal/engine"
@@ -21,8 +22,11 @@ type MoveReview struct {
 	Comment       string        `json:"comment"`
 }
 
-// Review compares played with the analysis' best move for the position m (masked for seat).
-func (h *HardAgent) Review(m *engine.GameState, seat int, an *Analysis, played engine.Action) MoveReview {
+// A canceled review has no verdict and must be discarded by the caller.
+func (h *HardAgent) Review(ctx context.Context, m *engine.GameState, seat int, an *Analysis, played engine.Action) MoveReview {
+	if ctx.Err() != nil || an == nil || len(an.Candidates) == 0 {
+		return MoveReview{}
+	}
 	best := an.Candidates[0]
 	r := MoveReview{Seat: seat, Played: played, PlayedText: engine.Describe(played), Best: best.Action, BestText: best.Text}
 	if normalize(played) == normalize(best.Action) {
@@ -31,7 +35,10 @@ func (h *HardAgent) Review(m *engine.GameState, seat int, an *Analysis, played e
 		r.Comment = "与" + h.Level().Name() + " AI 的首选一致"
 		return r
 	}
-	est := h.EstimateActions(m, seat, []engine.Action{best.Action, played}, 96)
+	est := h.EstimateActions(ctx, m, seat, []engine.Action{best.Action, played}, 96)
+	if ctx.Err() != nil || len(est) != 2 {
+		return r
+	}
 	r.BestWinRate, r.PlayedWinRate = est[0], est[1]
 	r.Delta = est[0] - est[1]
 	switch {

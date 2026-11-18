@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"gem/internal/auth"
 	"gem/internal/engine"
 	"gem/internal/game"
+	"gem/internal/replay"
 	"gem/internal/store"
 )
 
@@ -62,6 +64,11 @@ func doJSON(t *testing.T, method, url, token string, body, out any) int {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 500 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Logf("server error: %s", body)
+		return resp.StatusCode
+	}
 	if out != nil {
 		json.NewDecoder(resp.Body).Decode(out)
 	}
@@ -108,7 +115,7 @@ func TestReplayAnalysisWithoutLiveHints(t *testing.T) {
 	doJSON(t, "POST", srv.URL+"/api/auth/register", "", credentials{"reviewer", "secret1"}, &login)
 	ctx := context.Background()
 	const seed = 33
-	gid, err := st.CreateGame(ctx, "REPLAY", seed, []store.GamePlayer{{Seat: 0, UserID: &login.User.ID}, {Seat: 1, AILevel: "medium"}})
+	gid, err := st.CreateGame(ctx, "REPLAY", seed, []store.GamePlayer{{Seat: 0, UserID: &login.User.ID}, {Seat: 1, AILevel: "medium"}}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +146,7 @@ func TestReplayAnalysisWithoutLiveHints(t *testing.T) {
 	if err := st.FinishGame(ctx, gid, "finished", []int{int(state.Players[0].Points), int(state.Players[1].Points)}, nil); err != nil {
 		t.Fatal(err)
 	}
-	var before Replay
+	var before replay.Replay
 	if code := doJSON(t, "GET", url, login.Token, nil, &before); code != 200 {
 		t.Fatalf("replay: %d", code)
 	}
@@ -155,7 +162,7 @@ func TestReplayAnalysisWithoutLiveHints(t *testing.T) {
 			continue
 		}
 		mainCount++
-		var analyzed Frame
+		var analyzed replay.Frame
 		if code := doJSON(t, "POST", fmt.Sprintf("%s/analysis/%d", url, frame.Seq), login.Token, nil, &analyzed); code != 200 {
 			t.Fatalf("analyze seq %d: %d", frame.Seq, code)
 		}
@@ -163,7 +170,7 @@ func TestReplayAnalysisWithoutLiveHints(t *testing.T) {
 			t.Fatalf("incomplete analysis: %+v", analyzed)
 		}
 		if mainCount == 1 {
-			var cached Frame
+			var cached replay.Frame
 			doJSON(t, "POST", fmt.Sprintf("%s/analysis/%d", url, frame.Seq), login.Token, nil, &cached)
 			x, _ := json.Marshal(analyzed)
 			y, _ := json.Marshal(cached)
@@ -172,7 +179,7 @@ func TestReplayAnalysisWithoutLiveHints(t *testing.T) {
 			}
 		}
 	}
-	var after Replay
+	var after replay.Replay
 	doJSON(t, "GET", url, login.Token, nil, &after)
 	for _, frame := range after.Frames {
 		if frame.Main && (frame.Analysis == nil || frame.Review == nil) {
@@ -380,7 +387,7 @@ func TestFullGameTwoHumansTwoAIs(t *testing.T) {
 	t.Logf("game %d finished: points %v winners %v, alice moves %d (reviews %d), bob moves %d", a.over.GameID, a.over.Points, a.over.Winners, a.moves, len(a.over.Reviews), b.moves)
 
 	// The stored record replays to the same result.
-	var rec Replay
+	var rec replay.Replay
 	if c := doJSON(t, "GET", fmt.Sprintf("%s/api/games/%d", srv.URL, a.over.GameID), bob.Token, nil, &rec); c != 200 {
 		t.Fatalf("game record: %d", c)
 	}

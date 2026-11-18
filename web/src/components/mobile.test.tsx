@@ -187,6 +187,19 @@ describe('手机端组件结构', () => {
     expect(html).not.toContain('fixed')
   })
 
+  it('可选玩家页脚紧接所有手机玩家面板，桌面隐藏且默认不生成页脚', () => {
+    const view = fixture()
+    view.nPlayers = 4
+    view.players = [0, 1, 2, 3].map((seat) => ({ ...view.players[0], seat }))
+    const html = renderToStaticMarkup(<GameBoard view={view} room={null} playerFooter={<button>测试复盘控制</button>} />)
+    const players = html.match(/<section aria-label="玩家信息"[\s\S]*?<\/section>/)?.[0] ?? ''
+    expect(players.match(/查看玩家[1-4]预留卡/g)).toHaveLength(4)
+    expect(html).toContain(`${players}<div class="min-w-0 xl:hidden"><button>测试复盘控制</button></div>`)
+    expect(html.indexOf('测试复盘控制')).toBeLessThan(html.indexOf('aria-label="我方信息"'))
+    expect(renderToStaticMarkup(<GameBoard view={view} room={null} />)).not.toContain('测试复盘控制')
+    expect(renderToStaticMarkup(<GameBoard view={view} room={null} playerFooter={0} />)).toContain('<div class="min-w-0 xl:hidden">0</div>')
+  })
+
   it('归还筹码和选贵族阶段仍有完整操作入口且允许换行', () => {
     const discard = renderToStaticMarkup(<GameBoard view={fixture('discard')} room={null} onAct={() => {}} />)
     expect(discard).toContain('确认归还')

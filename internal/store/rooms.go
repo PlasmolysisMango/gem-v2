@@ -166,12 +166,15 @@ func (s *Store) ReplayHints(ctx context.Context, gameID int64) (map[int]string, 
 	return out, rows.Err()
 }
 
-func (s *Store) SaveReplayAnalysis(ctx context.Context, gameID int64, seat, seq, turn int, analysis, review string, playedWin, bestWin float64) error {
+func (s *Store) SaveReplayAnalysis(ctx context.Context, gameID int64, seat, seq, turn int, analysis, review string, playedWin, bestWin float64, lease ReplayLease) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
+	if err := checkReplayLease(ctx, tx, gameID, lease); err != nil {
+		return err
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO game_hints (game_id, seat, seq, analysis_json) VALUES (?, ?, ?, ?)
 		ON CONFLICT(game_id, seat, seq) DO UPDATE SET analysis_json = excluded.analysis_json`, gameID, seat, seq, analysis); err != nil {
 		return err

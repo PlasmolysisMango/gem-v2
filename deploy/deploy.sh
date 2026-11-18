@@ -20,6 +20,7 @@ INTERNAL_CONF="/etc/nginx/conf.d/gem.conf"
 PUBLIC_SNIPPET="/etc/nginx/snippets/gem.conf"
 IP_CONF="/etc/nginx/conf.d/ip-https.conf"
 SERVICE_NAME="gem-v2.service"
+REPLAY_SERVICE="gem-v2-replay.service"
 LEGACY_SERVICE="gem.service"
 ENV_FILE="/etc/gem-v2.env"
 INTERNAL_PORT=9095
@@ -89,6 +90,7 @@ if ! grep -q '^ENTRY_AUTH_MODE=' "$ENV_FILE"; then
   } >>"$ENV_FILE"
 fi
 install -m 0644 "$ROOT/deploy/gem-v2.service" "/etc/systemd/system/${SERVICE_NAME}"
+install -m 0644 "$ROOT/deploy/gem-v2-replay.service" "/etc/systemd/system/${REPLAY_SERVICE}"
 
 # 旧版 gem（v1）与 /gem/ 子路径、9096 端口冲突，确认新版已构建后再停掉。
 if systemctl is-active --quiet "$LEGACY_SERVICE"; then
@@ -99,6 +101,7 @@ fi
 step "启动后端"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null
+systemctl stop "$REPLAY_SERVICE"
 systemctl restart "$SERVICE_NAME"
 
 for _ in $(seq 1 30); do
@@ -111,6 +114,11 @@ curl -fsS "http://127.0.0.1:${BACKEND_PORT}/api/healthz" >/dev/null || {
   echo "后端健康检查失败，查看：journalctl -u ${SERVICE_NAME} -n 80" >&2
   exit 1
 }
+
+step "启动受限复盘后台"
+systemctl enable "$REPLAY_SERVICE" >/dev/null
+systemctl restart "$REPLAY_SERVICE"
+systemctl is-active --quiet "$REPLAY_SERVICE"
 
 step "安装 nginx 配置"
 BACKUP_DIR="/var/www/deploy-backups/gem-v2/$(date +%Y%m%d-%H%M%S)"

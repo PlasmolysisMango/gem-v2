@@ -58,6 +58,7 @@ export interface Frame {
 export interface Replay extends GameRecord {
   initial: View
   frames: Frame[]
+  background?: { state: string; retryAt?: number; error?: string }
 }
 
 let catalog: Promise<{ cards: Card[]; nobles: Noble[] }> | null = null

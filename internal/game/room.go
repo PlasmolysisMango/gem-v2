@@ -470,7 +470,7 @@ func (r *Room) start(s *Session) string {
 			}
 		}
 	}
-	id, err := r.hub.store.CreateGame(r.ctx, r.id, seed, players)
+	id, err := r.hub.store.CreateGame(r.ctx, r.id, seed, players, r.hints)
 	if err != nil {
 		return "保存对局失败：" + err.Error()
 	}
@@ -698,14 +698,18 @@ func (r *Room) requestHint(s *Session, idx int, reqID string) {
 	m := r.game.MaskFor(idx)
 	go func() {
 		an := r.coach.Analyze(r.ctx, &m, idx, true)
-		if an != nil && r.ctx.Err() == nil {
-			if b, err := json.Marshal(an); err == nil {
-				if err := r.hub.store.SetHint(context.Background(), r.gameID, idx, seq, string(b)); err != nil {
-					fmt.Println("store hint:", err)
-				}
+		if r.ctx.Err() != nil || an == nil || len(an.Candidates) == 0 {
+			return
+		}
+		if b, err := json.Marshal(an); err == nil {
+			if err := r.hub.store.SetHint(context.Background(), r.gameID, idx, seq, string(b)); err != nil {
+				fmt.Println("store hint:", err)
 			}
 		}
 		r.post(func() {
+			if r.ctx.Err() != nil {
+				return
+			}
 			delete(r.hintBusy, idx)
 			r.hintCache[idx] = hintEntry{seq: seq, an: an}
 			if r.seq != seq {
@@ -727,11 +731,17 @@ func (r *Room) review(idx int, pre engine.GameState, a engine.Action, seq int) {
 		if an == nil {
 			an = r.coach.Analyze(r.ctx, &pre, idx, false)
 		}
-		if r.ctx.Err() != nil || len(an.Candidates) == 0 {
+		if r.ctx.Err() != nil || an == nil || len(an.Candidates) == 0 {
 			return
 		}
-		rv := r.coach.Review(&pre, idx, an, a)
+		rv := r.coach.Review(r.ctx, &pre, idx, an, a)
+		if r.ctx.Err() != nil {
+			return
+		}
 		r.post(func() {
+			if r.ctx.Err() != nil {
+				return
+			}
 			r.reviews[idx] = append(r.reviews[idx], rv)
 			r.curve[idx] = append(r.curve[idx], CurvePoint{Turn: turn, WinRate: rv.PlayedWinRate, Best: rv.BestWinRate})
 			b, _ := json.Marshal(rv)

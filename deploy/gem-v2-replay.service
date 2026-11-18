@@ -1,0 +1,28 @@
+[Unit]
+Description=Gem v2 idle replay analysis
+BindsTo=gem-v2.service
+PartOf=gem-v2.service
+After=gem-v2.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/workspace/project/gem-v2
+Environment=GEM_DB=/var/lib/gem-v2/gem.db
+Environment=GOMAXPROCS=1
+ExecStartPre=/usr/bin/curl --fail --silent --show-error http://127.0.0.1:9096/api/healthz
+ExecStart=/root/workspace/project/gem-v2/dist/bin/gem-server --replay-worker
+Restart=always
+RestartSec=15
+TimeoutStopSec=30
+Slice=system.slice
+CPUQuota=10%
+CPUQuotaPeriodSec=100ms
+CPUWeight=10
+Nice=10
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=gem-v2.service
