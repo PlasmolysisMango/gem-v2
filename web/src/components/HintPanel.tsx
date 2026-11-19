@@ -16,10 +16,10 @@ const VERDICT_STYLE: Record<string, string> = {
   blunder: 'bg-rose-700',
 }
 
-export function ReviewBadge({ r, who }: { r: MoveReview; who?: string }) {
+export function ReviewBadge({ r, who, tag = '上一手' }: { r: MoveReview; who?: string; tag?: string }) {
   return (
     <div className={`${VERDICT_STYLE[r.verdict]} rounded px-2 py-1 text-sm`}>
-      {who && <div className="text-xs opacity-90">{who} 的上一手</div>}
+      {who && <div className="text-xs opacity-90">{who} · {tag}</div>}
       <b>{r.verdictText}</b>：{r.playedText}
       {r.verdict !== 'best' && (
         <div className="text-xs opacity-90">

@@ -43,7 +43,7 @@ function ReplayControls({ idx, n, playing, review, reviewer, onIndexChange, onPl
           className="min-w-0 min-h-[44px] xl:min-h-[32px] flex-1" />
         <span className="shrink-0 font-mono text-xs">{idx}/{n}</span>
       </div>
-      {review && <ReviewBadge r={review} who={reviewer} />}
+      {review && <ReviewBadge r={review} who={reviewer} tag="本手复盘" />}
     </div>
   )
 }
@@ -164,10 +164,10 @@ export default function Replay() {
   const reviews = useMemo(() => (data?.frames.map((f) => f.review).filter(Boolean) as MoveReview[]) ?? [], [data])
   const curveBySeat = useMemo(() => {
     const m = new Map<number, CurvePoint[]>()
-    data?.frames.forEach((f) => {
+    data?.frames.forEach((f, i) => {
       if (!f.review) return
       const arr = m.get(f.seat) ?? []
-      arr.push({ turn: f.turn, winRate: f.review.playedWinRate, best: f.review.bestWinRate })
+      arr.push({ turn: f.turn, winRate: f.review.playedWinRate, best: f.review.bestWinRate, frameIndex: i })
       m.set(f.seat, arr)
     })
     return m
@@ -188,7 +188,7 @@ export default function Replay() {
   const moveEvents = frameMoveEvents(data.frames.slice(0, idx))
   const jump = (i: number) => {
     setIdx(i)
-    if (!window.matchMedia(LANDSCAPE_QUERY).matches) {
+    if (typeof window !== 'undefined' && !window.matchMedia(LANDSCAPE_QUERY).matches) {
       document.getElementById('replay-board')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   }
@@ -213,7 +213,7 @@ export default function Replay() {
           {view.players.map((p) => (
             <PlayerPanel key={p.seat} view={view} room={room} seat={p.seat} lastMove={moves.get(p.seat)} moveEvents={moveEvents.get(p.seat)} />
           ))}
-          <ReplayControls idx={idx} n={n} playing={playing} review={frame?.review ?? null} reviewer={frame ? label(frame.seat) : ''} onIndexChange={setIdx} onPlayingChange={setPlaying} />
+          <ReplayControls idx={idx} n={n} playing={playing} review={next?.review ?? null} reviewer={next ? label(next.seat) : ''} onIndexChange={setIdx} onPlayingChange={setPlaying} />
         </section>
         <section id="replay-board" aria-label="棋盘" className="min-w-0 scroll-mt-2 flex flex-col gap-2 xl:min-h-0">
           <div className="card !p-2 flex flex-wrap items-center gap-2 shrink-0">
@@ -223,7 +223,7 @@ export default function Replay() {
           </div>
           <div className="min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto">
             <GameBoard view={view} room={room} moves={moves} moveHistory={moveEvents} hintAction={hint?.candidates[focus]?.action}
-              playerFooter={<ReplayControls idx={idx} n={n} playing={playing} review={frame?.review ?? null} reviewer={frame ? label(frame.seat) : ''} onIndexChange={setIdx} onPlayingChange={setPlaying} />} />
+              playerFooter={<ReplayControls idx={idx} n={n} playing={playing} review={next?.review ?? null} reviewer={next ? label(next.seat) : ''} onIndexChange={setIdx} onPlayingChange={setPlaying} />} />
           </div>
         </section>
         <aside className="min-w-0 flex flex-col gap-2 xl:min-h-0 xl:gap-3">
@@ -269,7 +269,14 @@ export default function Replay() {
                   <div key={seat} className="space-y-1">
                     <div className="text-sm">{label(seat)}</div>
                     <ReviewSummary reviews={reviews.filter((r) => r.seat === seat)} />
-                    <WinCurve curve={curve} />
+                    <WinCurve
+                      curve={curve}
+                      selectedTurn={next?.turn}
+                      onSelect={(i) => {
+                        const target = curve[i]?.frameIndex
+                        if (target !== undefined) jump(target)
+                      }}
+                    />
                   </div>
                 ))}
               </div>

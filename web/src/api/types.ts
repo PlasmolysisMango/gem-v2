@@ -193,6 +193,8 @@ export interface CurvePoint {
   turn: number
   winRate: number
   best: number
+  /** Replay frame of this move, used to jump to the position before it. */
+  frameIndex?: number
 }
 
 export interface GameOver {

@@ -235,7 +235,11 @@ export function ChatDialog({ chat, onSend, onClose }: { chat: ChatMessage[]; onS
   )
 }
 
-export function WinCurve({ curve }: { curve: CurvePoint[] }) {
+export function WinCurve({ curve, selectedTurn, onSelect }: {
+  curve: CurvePoint[]
+  selectedTurn?: number
+  onSelect?: (index: number) => void
+}) {
   const [hover, setHover] = useState<number | null>(null)
   if (curve.length === 0) return <div className="text-xs text-slate-500">暂无胜率数据</div>
   const w = 420
@@ -244,26 +248,28 @@ export function WinCurve({ curve }: { curve: CurvePoint[] }) {
   const last = curve[curve.length - 1].turn
   const x = (i: number) => first === last ? 225 : 40 + ((curve[i].turn - first) / (last - first)) * 365
   const y = (v: number) => 22 + (1 - v) * 112
-  const active = Math.min(hover ?? curve.length - 1, curve.length - 1)
+  const selected = selectedTurn === undefined ? -1 : curve.findIndex((p) => p.turn === selectedTurn)
+  const active = Math.min(hover ?? (selected >= 0 ? selected : curve.length - 1), curve.length - 1)
   const point = curve[active]
   const line = (k: 'winRate' | 'best') => curve.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join(' ')
+  const nearest = (clientX: number, rect: DOMRect) => {
+    const px = ((clientX - rect.left) / rect.width) * w
+    let best = 0
+    curve.forEach((_, i) => {
+      if (Math.abs(x(i) - px) < Math.abs(x(best) - px)) best = i
+    })
+    return best
+  }
   return (
     <div className="space-y-1">
-      <div className="text-[11px] text-slate-400">胜率（实线：实际着法；虚线：最佳着法）</div>
+      <div className="text-[11px] text-slate-400">胜率（实线：实际着法；虚线：最佳着法；点击数据点跳转回合）</div>
       <svg
-        aria-label="胜率曲线，移动鼠标或聚焦数据点查看百分比"
+        aria-label="胜率曲线，移动鼠标或聚焦数据点查看百分比，点击或按回车跳转到该回合"
         viewBox={`0 0 ${w} ${h}`}
-        className="w-full h-auto bg-slate-950/60 rounded"
-        onPointerMove={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect()
-          const px = ((e.clientX - rect.left) / rect.width) * w
-          let nearest = 0
-          curve.forEach((_, i) => {
-            if (Math.abs(x(i) - px) < Math.abs(x(nearest) - px)) nearest = i
-          })
-          setHover(nearest)
-        }}
+        className={`w-full h-auto bg-slate-950/60 rounded ${onSelect ? 'cursor-pointer' : ''}`}
+        onPointerMove={(e) => setHover(nearest(e.clientX, e.currentTarget.getBoundingClientRect()))}
         onPointerLeave={() => setHover(null)}
+        onClick={onSelect ? (e) => onSelect(nearest(e.clientX, e.currentTarget.getBoundingClientRect())) : undefined}
       >
         {[0, 0.5, 1].map((v) => (
           <g key={v}>
@@ -274,19 +280,33 @@ export function WinCurve({ curve }: { curve: CurvePoint[] }) {
         <path d={line('best')} fill="none" stroke="#a78bfa" strokeWidth={1.5} strokeDasharray="3 2" />
         <path d={line('winRate')} fill="none" stroke="#f0abfc" strokeWidth={2} />
         <line x1={x(active)} x2={x(active)} y1={22} y2={134} stroke="#cbd5e1" strokeDasharray="2 3" />
-        {curve.map((p, i) => (
-          <circle
-            key={p.turn}
-            tabIndex={0}
-            aria-label={`第 ${p.turn + 1} 回合：实际 ${pct(p.winRate)}，最佳 ${pct(p.best)}`}
-            onFocus={() => setHover(i)}
-            onBlur={() => setHover(null)}
-            cx={x(i)} cy={y(p.winRate)} r={i === active ? 4 : 2.5}
-            fill={p.best - p.winRate > 0.15 ? '#f43f5e' : p.best - p.winRate > 0.05 ? '#f59e0b' : '#f0abfc'}
-          >
-            <title>{`第 ${p.turn + 1} 回合：实际 ${pct(p.winRate)}，最佳 ${pct(p.best)}`}</title>
-          </circle>
-        ))}
+        {curve.map((p, i) => {
+          const label = `第 ${p.turn + 1} 回合：实际 ${pct(p.winRate)}，最佳 ${pct(p.best)}`
+          const select = onSelect ? () => onSelect(i) : undefined
+          return (
+            <g key={p.turn}>
+              <circle
+                tabIndex={0}
+                role={select ? 'button' : undefined}
+                aria-label={label}
+                onFocus={() => setHover(i)}
+                onBlur={() => setHover(null)}
+                onKeyDown={select ? (e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    select()
+                  }
+                } : undefined}
+                cx={x(i)} cy={y(p.winRate)} r={i === active ? 4 : 2.5}
+                fill={p.best - p.winRate > 0.15 ? '#f43f5e' : p.best - p.winRate > 0.05 ? '#f59e0b' : '#f0abfc'}
+                stroke={i === selected ? '#fde047' : undefined}
+                strokeWidth={i === selected ? 1.5 : undefined}
+              >
+                <title>{label}</title>
+              </circle>
+            </g>
+          )
+        })}
         <text x={40} y={153} fill="#94a3b8" fontSize={11}>第 {first + 1} 回合</text>
         {last !== first && <text x={405} y={153} textAnchor="end" fill="#94a3b8" fontSize={11}>第 {last + 1} 回合</text>}
       </svg>

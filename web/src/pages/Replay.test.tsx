@@ -4,9 +4,10 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { StaticRouter } from 'react-router-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, type Frame, type Replay as ReplayData } from '../api/http'
-import type { Action, View } from '../api/types'
+import type { Action, CurvePoint, View } from '../api/types'
 import { GameBoard } from '../components/GameBoard'
 import { HintPanel } from '../components/HintPanel'
+import { WinCurve } from '../components/Panels'
 import Replay from './Replay'
 
 const route = vi.hoisted(() => ({ id: '1' }))
@@ -208,9 +209,9 @@ describe('Replay controls and analysis effects', () => {
     expect(controls[0]).toContain('flex justify-center')
     expect(controls[0]).toContain('aria-label="复盘进度"')
     expect(controls[0]).toContain('3/4')
-    expect(controls[0]).toContain('测试玩家3 的上一手')
+    expect(controls[0]).toContain('测试玩家4 · 本手复盘')
     expect(controls[0]).toContain('测试失误')
-    expect(controls[0]!.indexOf('测试玩家3 的上一手')).toBeGreaterThan(controls[0]!.indexOf('aria-label="复盘进度"'))
+    expect(controls[0]!.indexOf('测试玩家4 · 本手复盘')).toBeGreaterThan(controls[0]!.indexOf('aria-label="复盘进度"'))
     expect(html).not.toMatch(/[⏮⏭◀▶]/)
     const players = html.match(/<section aria-label="玩家信息"[\s\S]*?<\/section>/)?.[0] ?? ''
     expect(html).toContain(`${players}<div class="min-w-0 xl:hidden">${controls[1]}</div>`)
@@ -219,6 +220,24 @@ describe('Replay controls and analysis effects', () => {
     expect(board.slice(0, board.indexOf('class="game-board'))).not.toContain('测试失误')
     expect(board.slice(0, board.indexOf('class="game-board'))).not.toContain('aria-label="复盘控制"')
     expect(requests).toHaveLength(0)
+  })
+
+  it('jumps to the position before a selected win-rate point so the badge and AI analysis name the same player', async () => {
+    vi.mocked(api.game).mockResolvedValue(savedFixture())
+    await harness.settle()
+    type CurveProps = { curve: CurvePoint[]; selectedTurn?: number; onSelect: (i: number) => void }
+    const curves = elements(harness.tree).filter((node) => node.type === WinCurve) as ReactElement<CurveProps>[]
+    const seatCurve = curves.find((node) => node.props.curve.some((p) => p.turn === 2))
+    expect(seatCurve).toBeDefined()
+    seatCurve!.props.onSelect(seatCurve!.props.curve.findIndex((p) => p.turn === 2))
+    harness.flush()
+    const html = harness.html()
+    expect(html).toContain('2/4')
+    expect(html).toContain('测试玩家3 · 行动前 AI 提示')
+    expect(html).toContain('测试玩家3 · 本手复盘')
+    const updated = (elements(harness.tree).filter((node) => node.type === WinCurve) as ReactElement<CurveProps>[])
+      .find((node) => node.props.curve.some((p) => p.turn === 2))!
+    expect(updated.props.selectedTurn).toBe(2)
   })
 
   it('aborts an old request on navigation and prioritizes frames[idx] before earlier missing main frames', async () => {
