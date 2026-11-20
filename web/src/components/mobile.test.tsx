@@ -5,10 +5,10 @@ import Lobby from '../pages/Lobby'
 import Room from '../pages/Room'
 import * as authStore from '../store/auth'
 import * as gameStore from '../store/game'
-import type { Action, Analysis, Card, GameOver, MoveEvent, RoomState, View } from '../api/types'
+import type { Action, Analysis, Card, GameEvent, GameOver, MoveEvent, RoomState, View } from '../api/types'
 import { GameBoard } from './GameBoard'
 import { HintPanel } from './HintPanel'
-import { GameOverModal, PlayerPanel, WinCurve } from './Panels'
+import { EventLog, GameOverModal, PlayerPanel, WinCurve } from './Panels'
 import { CardTile, GemToken, MoveIcons, TokenRow } from './Pieces'
 
 const action = (values: Partial<Action>): Action => ({
@@ -290,6 +290,31 @@ describe('手机端组件结构', () => {
     expect(extra).toContain('flex-wrap')
   })
 
+  it('日志按玩家名加行动图标显示，结束提示不会伪装成跳过', () => {
+    const event = (values: Partial<GameEvent>): GameEvent => ({
+      kind: 'action', seat: 0, action: action({ type: 'take_diff', gems: [1, 1, 0, 0, 0, 0] }),
+      card: -1, noble: -1, paid: [0, 0, 0, 0, 0, 0], gold: false, seq: 1, text: '我方测试 拿取 蓝1 绿1', ...values,
+    })
+    const html = renderToStaticMarkup(
+      <EventLog
+        log={[
+          event({}),
+          event({ kind: 'noble', seat: 1, noble: 2, text: '对手测试 迎来 贵族（+3 分）' }),
+          event({ kind: 'game_over', seat: -1, text: '对局结束' }),
+        ]}
+        seatName={(s) => `玩家${s + 1}`}
+      />,
+    )
+    expect(html).toContain('玩家1')
+    expect(html).toContain('aria-label="白 1 枚"')
+    expect(html).toContain('aria-label="蓝 1 枚"')
+    expect(html).toContain('玩家2')
+    expect(html).toContain('贵族到访，获得3分')
+    expect(html).toContain('对局结束')
+    expect(html).not.toContain('跳过')
+    expect(renderToStaticMarkup(<EventLog log={[]} />)).toContain('还没有行动')
+  })
+
   it('横屏右侧面板以提示、聊天、日志页签共用，顶栏不再放聊天和日志按钮；竖屏双方在银行下方', () => {
     const state = gameStore.useGame.getState()
     const room: RoomState = {
@@ -394,6 +419,11 @@ describe('手机端组件结构', () => {
     expect(html).toContain('shrink-0')
     expect(html).toContain('由大师 AI（ISMCTS）在你的视角下实时演算')
     expect(html).not.toContain('困难 AI')
+    expect(html).not.toMatch(/<button[^>]*>提示<\/button>/)
+    const idle = renderToStaticMarkup(
+      <HintPanel enabled myTurn loading={false} hint={null} onRequest={() => {}} onFocus={() => {}} focus={0} lastReview={null} />,
+    )
+    expect(idle).toMatch(/<button[^>]*>提示<\/button>/)
     const loading = renderToStaticMarkup(
       <HintPanel enabled myTurn loading hint={null} onRequest={() => {}} onFocus={() => {}} focus={0} lastReview={null} />,
     )

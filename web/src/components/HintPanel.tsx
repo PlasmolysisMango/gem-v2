@@ -59,7 +59,7 @@ export function HintPanel({
   return (
     <div className="min-w-0 space-y-3 break-words">
       <div className="flex flex-wrap items-center gap-2">
-        {!replay && <button
+        {!replay && !hint && <button
           className="min-h-[44px] min-w-[44px] px-3 py-1.5 rounded bg-fuchsia-600 hover:bg-fuchsia-500 disabled:opacity-40 font-semibold"
           disabled={!myTurn || loading}
           onClick={onRequest}

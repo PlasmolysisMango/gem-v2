@@ -201,7 +201,7 @@ export default function Room() {
               aria-labelledby="room-tab-log"
               className={`flex min-h-0 flex-col xl:flex-1 ${shown === 'log' ? '' : 'hidden'}`}
             >
-              <EventLog log={g.log} className="h-64 xl:h-auto xl:flex-1 xl:min-h-0" />
+              <EventLog log={g.log} seatName={(s) => seatLabel(room, s)} className="h-64 xl:h-auto xl:flex-1 xl:min-h-0" />
             </div>
           </div>
         </aside>

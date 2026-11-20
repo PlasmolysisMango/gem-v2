@@ -132,15 +132,27 @@ export function PanelDialog({ title, onClose, children }: { title: string; onClo
   )
 }
 
-export function EventLog({ log, className = 'h-64 xl:h-48' }: { log: GameEvent[]; className?: string }) {
+/** 日志与玩家面板的“上一步”共用图标渲染；盲扣牌在服务端按视角隐藏，不会泄露身份。 */
+export function EventLog({ log, seatName, className = 'h-64 xl:h-48' }: {
+  log: GameEvent[]
+  seatName?: (seat: number) => string
+  className?: string
+}) {
+  const cards = useCardCatalog()
   return (
     <div
-      className={`${className} min-w-0 overflow-y-auto break-words text-sm xl:text-xs space-y-0.5 font-mono bg-slate-950/60 rounded p-2 flex flex-col-reverse`}
+      className={`${className} min-w-0 overflow-y-auto break-words text-sm xl:text-xs space-y-1 bg-slate-950/60 rounded p-2 flex flex-col-reverse`}
     >
-      <div>
-        {log.map((e, i) => (
-          <div key={i} className={e.kind === 'noble' ? 'text-amber-300' : ''}>
-            {e.text}
+      <div className="space-y-1">
+        {log.length === 0 && <div className="text-slate-500">还没有行动</div>}
+        {log.map((e, i) => e.kind === 'game_over' ? (
+          <div key={i} className="font-semibold text-amber-300" title={e.text}>
+            {e.text || '对局结束'}
+          </div>
+        ) : (
+          <div key={i} className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5" title={e.text}>
+            <span className="shrink-0 font-semibold text-sky-300">{seatName?.(e.seat) ?? `玩家${e.seat + 1}`}</span>
+            <MoveIcons events={[e]} cards={cards} />
           </div>
         ))}
       </div>
