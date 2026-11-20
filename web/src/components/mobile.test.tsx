@@ -8,7 +8,7 @@ import * as gameStore from '../store/game'
 import type { Action, Analysis, Card, GameOver, MoveEvent, RoomState, View } from '../api/types'
 import { GameBoard } from './GameBoard'
 import { HintPanel } from './HintPanel'
-import { ChatDialog, GameOverModal, LogDialog, PlayerPanel, WinCurve } from './Panels'
+import { GameOverModal, PlayerPanel, WinCurve } from './Panels'
 import { CardTile, GemToken, MoveIcons, TokenRow } from './Pieces'
 
 const action = (values: Partial<Action>): Action => ({
@@ -290,7 +290,7 @@ describe('手机端组件结构', () => {
     expect(extra).toContain('flex-wrap')
   })
 
-  it('横屏左侧只显示对手、右侧只显示 AI，聊天旁是日志按钮；竖屏双方在银行下方', () => {
+  it('横屏右侧面板以提示、聊天、日志页签共用，顶栏不再放聊天和日志按钮；竖屏双方在银行下方', () => {
     const state = gameStore.useGame.getState()
     const room: RoomState = {
       id: 'TEST', name: '测试房间', ownerId: 1, ownerName: '我方测试', status: 'playing', hints: false,
@@ -306,16 +306,24 @@ describe('手机端组件结构', () => {
       expect(opponents).not.toContain('我方测试')
       expect(opponents).toContain('hidden xl:flex')
       expect(html).toContain('我方 · 我方测试')
-      const ai = html.match(/<aside aria-label="AI提示"[\s\S]*?<\/aside>/)?.[0] ?? ''
-      expect(ai).toContain('room-hint')
-      expect(ai).not.toContain('操作日志')
-      expect(ai).not.toContain('聊天')
-      expect(html).toMatch(/聊天[\s\S]*?<\/button><button[^>]*aria-label="操作日志"[^>]*>日志<\/button>/)
+      const panel = html.match(/<aside aria-label="房间面板"[\s\S]*?<\/aside>/)?.[0] ?? ''
+      expect(panel).toContain('role="tablist"')
+      for (const id of ['room-tab-hint', 'room-tab-chat', 'room-tab-log', 'room-hint', 'room-chat', 'room-log']) {
+        expect(panel).toContain(id)
+      }
+      expect(panel).toContain('aria-selected="true"')
+      expect(html).not.toContain('aria-label="操作日志"')
+      expect(html).not.toMatch(/aria-haspopup="dialog"[^>]*>\s*聊天/)
       spy.mockReturnValue({ ...state, room, view: { ...fixture(), viewer: -1 } })
       const spectator = renderToStaticMarkup(<StaticRouter location="/room/TEST"><Room /></StaticRouter>)
       const players = spectator.match(/<section aria-label="玩家信息"[\s\S]*?<\/section>/)?.[0] ?? ''
       expect(players).toContain('我方测试')
       expect(players).toContain('对手测试')
+      const spectPanel = spectator.match(/<aside aria-label="房间面板"[\s\S]*?<\/aside>/)?.[0] ?? ''
+      expect(spectPanel).toContain('room-tab-chat')
+      expect(spectPanel).toContain('room-tab-log')
+      expect(spectPanel).not.toContain('room-tab-hint')
+      expect(spectPanel).not.toContain('id="room-hint"')
     } finally {
       spy.mockRestore()
     }
@@ -344,27 +352,25 @@ describe('手机端组件结构', () => {
     expect(players.indexOf('我方 · 玩家3')).toBeLessThan(players.indexOf('玩家4'))
   })
 
-  it('上一步盲扣图标提供详情入口但不从目录泄漏暗牌身份，购买图标不可打开预留', () => {
+  it('上一步盲扣图标提供详情入口但不从目录泄漏暗牌身份，购买图标提供独立详情入口', () => {
     const move: MoveEvent = { kind: 'action', seat: 1, action: action({ type: 'reserve_deck', level: 2 }), card: -12, noble: -1, paid: [0, 0, 0, 0, 0, 0], gold: true }
     const html = renderToStaticMarkup(<MoveIcons events={[move]} cards={[card(50)]} onReserveClick={() => {}} />)
     expect(html).toContain('查看上一步预留卡详情')
     expect(html).toContain('L2 暗牌')
     expect(html).not.toContain('蓝卡')
-    const buy = renderToStaticMarkup(<MoveIcons events={[{ ...move, card: 50, action: action({ type: 'buy_reserved', card: 50 }) }]} cards={[card(50)]} onReserveClick={() => {}} />)
+    const bought = { ...move, card: 50, action: action({ type: 'buy_reserved', card: 50 }) }
+    const buy = renderToStaticMarkup(<MoveIcons events={[bought]} cards={[card(50)]} onReserveClick={() => {}} />)
     expect(buy).not.toContain('查看上一步预留卡详情')
+    expect(buy).not.toContain('查看上一步购买卡详情')
+    const buyDetail = renderToStaticMarkup(<MoveIcons events={[bought]} cards={[card(50)]} onBuyClick={() => {}} />)
+    expect(buyDetail).toContain('查看上一步购买卡详情')
+    expect(buyDetail).not.toContain('查看上一步预留卡详情')
+    const panel = renderToStaticMarkup(<PlayerPanel view={fixture()} room={null} seat={1} moveEvents={[bought]} />)
+    expect(panel).toContain('查看上一步购买卡详情')
     const view = fixture()
     view.players[1].reserved = []
     const empty = renderToStaticMarkup(<PlayerPanel view={view} room={null} seat={1} />)
     expect(empty).toMatch(/disabled=""[^>]*>预留/)
-  })
-
-  it('日志共用有高度约束的模态弹层，完整保留日志和关闭入口', () => {
-    const html = renderToStaticMarkup(<LogDialog log={[{ kind: 'action', seat: 0, action: action({}), card: -1, noble: -1, paid: [0, 0, 0, 0, 0, 0], gold: false, seq: 1, text: '测试操作' }]} onClose={() => {}} />)
-    expect(html).toContain('aria-modal="true"')
-    expect(html).toContain('result-dialog')
-    expect(html).toContain('overflow-y-auto')
-    expect(html).toContain('关闭操作日志')
-    expect(html).toContain('测试操作')
   })
 
   it('提示候选支持键盘与触控，选择候选不会自动执行动作', () => {
@@ -393,15 +399,6 @@ describe('手机端组件结构', () => {
     )
     expect(loading).toContain('大师 AI 演算中…')
     expect(loading).not.toContain('困难 AI')
-  })
-
-  it('聊天以弹层打开：手机底部抽屉、大屏右侧抽屉，带关闭入口', () => {
-    const html = renderToStaticMarkup(<ChatDialog chat={[{ from: 'alice', seat: 0, text: 'hi' }]} onSend={() => {}} onClose={() => {}} />)
-    expect(html).toContain('role="dialog"')
-    expect(html).toContain('h-[70dvh] w-full')
-    expect(html).toContain('sm:w-96')
-    expect(html).toContain('aria-label="关闭聊天"')
-    expect(html).toContain('alice')
   })
 
   it('结果弹窗宽度受视口约束、可滚动并有顶部关闭入口', () => {

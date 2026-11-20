@@ -27,7 +27,7 @@ export function PlayerPanel({
   own?: boolean
   onInspectReserved?: (card?: Card) => void
 }) {
-  const [detail, setDetail] = useState<{ card?: Card } | null>(null)
+  const [detail, setDetail] = useState<{ card?: Card; kind: 'reserve' | 'buy' } | null>(null)
   const p = view.players[seat]
   const info = room?.seats[seat]
   const active = view.current === seat && view.phase !== 'over'
@@ -37,8 +37,9 @@ export function PlayerPanel({
   const canInspect = !own || compact
   const inspect = (card?: Card) => {
     if (onInspectReserved) onInspectReserved(card)
-    else setDetail({ card })
+    else setDetail({ card, kind: 'reserve' })
   }
+  const inspectBought = (card: Card) => setDetail({ card, kind: 'buy' })
   return (
     <div
       className={`min-w-0 rounded-lg border-2 ${compact ? 'p-1.5' : 'p-2'} ${own ? 'h-full' : ''}
@@ -69,11 +70,11 @@ export function PlayerPanel({
       <div className="flex min-w-0 items-center gap-1 border-t border-slate-700/60 pt-1 text-xs text-slate-200" title={lastMove}
         aria-label={`${seatLabel(room, seat)}上一步：${lastMove ?? '尚未行动'}`}>
         <span className="shrink-0 text-[10px] text-slate-500">上一步</span>
-        {moveEvents?.length ? <MoveIcons events={moveEvents} cards={visibleCards} compact={compact} onReserveClick={canInspect ? inspect : undefined} /> : <span className="min-w-0 break-words">{lastMove ?? '—'}</span>}
+        {moveEvents?.length ? <MoveIcons events={moveEvents} cards={visibleCards} compact={compact} onReserveClick={canInspect ? inspect : undefined} onBuyClick={inspectBought} /> : <span className="min-w-0 break-words">{lastMove ?? '—'}</span>}
       </div>
       {detail && (
-        <PanelDialog title={`${seatLabel(room, seat)} · 预留详情`} onClose={() => setDetail(null)}>
-          <div className="grid grid-cols-3 gap-2" aria-label="预留卡详情">
+        <PanelDialog title={`${seatLabel(room, seat)} · ${detail.kind === 'buy' ? '购买详情' : '预留详情'}`} onClose={() => setDetail(null)}>
+          <div className="grid grid-cols-3 gap-2" aria-label={detail.kind === 'buy' ? '购买卡详情' : '预留卡详情'}>
             {(detail.card ? [detail.card] : p.reserved).map((c, i) => (
               <div key={i} className="h-32"><CardTile card={c} fluid /></div>
             ))}
@@ -84,7 +85,7 @@ export function PlayerPanel({
   )
 }
 
-/** 日志和预留详情共用弹层，支持 Esc、遮罩关闭及键盘焦点恢复。 */
+/** 预留详情弹层，支持 Esc、遮罩关闭及键盘焦点恢复。 */
 export function PanelDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const titleId = useId()
   const dialog = useRef<HTMLDivElement>(null)
@@ -131,14 +132,6 @@ export function PanelDialog({ title, onClose, children }: { title: string; onClo
   )
 }
 
-export function LogDialog({ log, onClose }: { log: GameEvent[]; onClose: () => void }) {
-  return (
-    <PanelDialog title="操作日志" onClose={onClose}>
-      <EventLog log={log} className="h-[min(65dvh,36rem)] min-h-0" />
-    </PanelDialog>
-  )
-}
-
 export function EventLog({ log, className = 'h-64 xl:h-48' }: { log: GameEvent[]; className?: string }) {
   return (
     <div
@@ -159,12 +152,10 @@ export function Chat({
   chat,
   onSend,
   className = 'h-48 xl:h-24',
-  autoFocus,
 }: {
   chat: ChatMessage[]
   onSend: (t: string) => void
   className?: string
-  autoFocus?: boolean
 }) {
   const [text, setText] = useState('')
   const list = useRef<HTMLDivElement>(null)
@@ -196,41 +187,9 @@ export function Chat({
           onChange={(e) => setText(e.target.value)}
           placeholder="聊天…"
           maxLength={200}
-          autoFocus={autoFocus}
         />
         <button className="btn text-xs">发送</button>
       </form>
-    </div>
-  )
-}
-
-/** Room chat opened from a button: a bottom sheet on phones, a right-hand drawer on larger screens. */
-export function ChatDialog({ chat, onSend, onClose }: { chat: ChatMessage[]; onSend: (t: string) => void; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 sm:items-stretch sm:justify-end" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="chat-title"
-        className="flex h-[70dvh] w-full min-w-0 flex-col gap-2 rounded-t-xl border border-slate-600 bg-slate-900 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:h-full sm:w-96 sm:rounded-none sm:rounded-l-xl"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.stopPropagation()
-            onClose()
-          }
-        }}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <h2 id="chat-title" className="font-bold">
-            房间聊天
-          </h2>
-          <button className="btn text-sm" onClick={onClose} aria-label="关闭聊天">
-            关闭
-          </button>
-        </div>
-        <Chat chat={chat} onSend={onSend} className="flex-1 xl:text-sm" autoFocus />
-      </div>
     </div>
   )
 }

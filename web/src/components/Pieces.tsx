@@ -297,11 +297,12 @@ export function CardMark({ card, level = 0 }: { card?: Card; level?: number }) {
 }
 
 /** 同色合并为一个数字筹码；极长的回合可自然换行，保留完整信息。 */
-export function MoveIcons({ events, cards, compact, onReserveClick }: {
+export function MoveIcons({ events, cards, compact, onReserveClick, onBuyClick }: {
   events: MoveEvent[]
   cards: Card[]
   compact?: boolean
   onReserveClick?: (card: Card) => void
+  onBuyClick?: (card: Card) => void
 }) {
   const chips = (gems: Gems) => ALL_COLORS.map((c, i) => gems[i] > 0 && (
     <span key={c} aria-label={`${COLOR_NAME[c]} ${gems[i]} 枚`}
@@ -332,7 +333,13 @@ export function MoveIcons({ events, cards, compact, onReserveClick }: {
             {i > 0 && <span className="text-slate-600">·</span>}
             <span className="text-slate-400">{take ? '拿' : buy ? '买' : reserve ? '留' : type === 'discard' ? '还' : '跳过'}</span>
             {(take || type === 'discard') && chips(e.action.gems)}
-            {reserve && onReserveClick ? (
+            {buy && onBuyClick && card ? (
+              <button type="button" className="inline-flex min-h-[32px] min-w-[32px] items-center justify-center rounded hover:bg-slate-700"
+                aria-label="查看上一步购买卡详情" aria-haspopup="dialog"
+                onClick={() => onBuyClick(card)}>
+                <CardMark card={card} level={level} />
+              </button>
+            ) : reserve && onReserveClick ? (
               <button type="button" className="inline-flex min-h-[32px] min-w-[32px] items-center justify-center rounded hover:bg-slate-700"
                 aria-label="查看上一步预留卡详情" aria-haspopup="dialog" disabled={!reservedCard}
                 onClick={() => reservedCard && onReserveClick(reservedCard)}>

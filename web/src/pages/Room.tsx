@@ -3,11 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import type { ChatMessage, RoomState, SeatInfo } from '../api/types'
 import { GameBoard, seatLabel } from '../components/GameBoard'
 import { HintPanel } from '../components/HintPanel'
-import { ChatDialog, GameOverModal, LogDialog, PlayerPanel, ReviewSummary } from '../components/Panels'
+import { Chat, EventLog, GameOverModal, PlayerPanel, ReviewSummary } from '../components/Panels'
 import { LANDSCAPE_QUERY, lastMoveEvents, lastMoves } from '../lib/gems'
 import { useAuth } from '../store/auth'
 import { useGame } from '../store/game'
 import { LEVEL_NAME } from './Lobby'
+
+type RoomPanel = 'hint' | 'chat' | 'log'
 
 export default function Room() {
   const { id = '' } = useParams()
@@ -16,18 +18,17 @@ export default function Room() {
   const user = useAuth((s) => s.user)
   const [focus, setFocus] = useState(0)
   const [showOver, setShowOver] = useState(true)
-  const [logOpen, setLogOpen] = useState(false)
-  const [chatOpen, setChatOpen] = useState(false)
+  const [panel, setPanel] = useState<RoomPanel>('hint')
   const [chatSeen, setChatSeen] = useState<ChatMessage | null>(null)
 
   useEffect(() => {
-    setLogOpen(false)
-    setChatOpen(false)
+    setPanel('hint')
     setChatSeen(null)
   }, [id])
+  const chatShown = panel === 'chat' || (!!g.view && g.view.viewer < 0 && panel === 'hint')
   useEffect(() => {
-    if (chatOpen) setChatSeen(g.chat[g.chat.length - 1] ?? null)
-  }, [chatOpen, g.chat])
+    if (chatShown) setChatSeen(g.chat[g.chat.length - 1] ?? null)
+  }, [chatShown, g.chat])
 
   useEffect(() => {
     g.joinRoom(id.toUpperCase())
@@ -93,9 +94,12 @@ export default function Room() {
   const leaveText = '离开'
   // chat keeps the last 100 messages, so count what arrived after the last one seen
   const unread = g.chat.length - 1 - (chatSeen ? g.chat.lastIndexOf(chatSeen) : -1)
+  const shown: RoomPanel = view.viewer < 0 && panel === 'hint' ? 'chat' : panel
+  const tabs = view.viewer >= 0
+    ? ([['hint', '提示'], ['chat', '聊天'], ['log', '日志']] as const)
+    : ([['chat', '聊天'], ['log', '日志']] as const)
 
-  // 宽横屏三列：对手、棋盘、AI 提示；聊天和日志从顶栏按钮打开。
-  // 竖屏自然滚动：棋盘、银行、双方玩家信息、AI 提示。
+  // 宽横屏三列：对手、棋盘、共用面板；竖屏自然滚动：棋盘、银行、双方玩家信息、共用面板。
   return (
     <div className="mx-auto min-w-0 max-w-[2400px] flex flex-col gap-2 sm:gap-3 xl:h-full">
       {toast}
@@ -113,30 +117,11 @@ export default function Room() {
             查看对局结果
           </button>
         )}
-        <button
-          className="btn relative ml-auto text-xs !px-2 sm:!px-3"
-          onClick={() => { setLogOpen(false); setChatOpen(true) }}
-          aria-label={unread > 0 ? `房间聊天（${unread} 条未读）` : '房间聊天'}
-          aria-haspopup="dialog"
-        >
-          聊天
-          {unread > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-[1.1rem] text-white">
-              {unread > 99 ? '99+' : unread}
-            </span>
-          )}
-        </button>
-        <button className="btn text-xs !px-2 sm:!px-3" onClick={() => { setChatOpen(false); setLogOpen(true) }}
-          aria-label="操作日志" aria-haspopup="dialog">
-          日志
-        </button>
-        <button className="btn text-xs !px-2 sm:!px-3" onClick={leave} aria-label={leaveText}>
+        <button className="btn ml-auto text-xs !px-2 sm:!px-3" onClick={leave} aria-label={leaveText}>
           {leaveText}
         </button>
       </div>
-      <div className={`min-w-0 flex flex-col gap-2 sm:gap-3 xl:flex-1 xl:min-h-0 xl:grid xl:gap-3 ${view.viewer >= 0
-        ? 'xl:grid-cols-[clamp(13rem,16vw,21rem)_minmax(0,1fr)_clamp(13rem,20vw,26rem)]'
-        : 'xl:grid-cols-[clamp(13rem,16vw,21rem)_minmax(0,1fr)]'}`}>
+      <div className="min-w-0 flex flex-col gap-2 sm:gap-3 xl:flex-1 xl:min-h-0 xl:grid xl:grid-cols-[clamp(13rem,16vw,21rem)_minmax(0,1fr)_clamp(13rem,20vw,26rem)] xl:gap-3">
         <section
           aria-label={view.viewer >= 0 ? '对手信息' : '玩家信息'}
           className="hidden xl:flex xl:flex-col xl:gap-2 xl:min-h-0 xl:overflow-y-auto xl:pr-1"
@@ -149,35 +134,78 @@ export default function Room() {
           <GameBoard view={view} room={room} onAct={view.viewer >= 0 ? g.act : undefined} hintAction={hintAction}
             moves={moves} moveHistory={moveEvents} />
         </section>
-        {view.viewer >= 0 && (
-          <aside aria-label="AI提示" className="min-w-0 flex flex-col gap-2 xl:min-h-0 xl:gap-3">
-            <div id="room-hint" className="card xl:flex-1 xl:min-h-0 xl:overflow-y-auto">
-              <HintPanel
-                enabled={room.hints}
-                myTurn={myTurn && view.phase === 'main'}
-                loading={g.hintLoading}
-                hint={g.hint}
-                onRequest={g.requestHint}
-                onFocus={(i) => {
-                  setFocus(i)
-                  if (!window.matchMedia(LANDSCAPE_QUERY).matches)
-                    document.getElementById('room-board')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-                }}
-                focus={focus}
-                lastReview={g.lastReview}
-                seatName={(s) => seatLabel(room, s)}
-              />
-              {room.hints && g.reviews.length > 0 && (
-                <div className="mt-2">
-                  <ReviewSummary reviews={g.reviews} />
-                </div>
-              )}
+        <aside aria-label="房间面板" className="min-w-0 flex flex-col gap-2 xl:min-h-0 xl:gap-3">
+          <div className="card flex min-h-0 flex-col gap-2 xl:flex-1 xl:min-h-0">
+            <nav role="tablist" aria-label="房间面板" className={`grid shrink-0 gap-1 ${view.viewer >= 0 ? 'grid-cols-3' : 'grid-cols-2'}`}>
+              {tabs.map(([key, text]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  id={`room-tab-${key}`}
+                  aria-selected={shown === key}
+                  aria-controls={`room-${key}`}
+                  aria-label={key === 'chat' && unread > 0 ? `聊天（${unread} 条未读）` : text}
+                  className={`${shown === key ? 'btn-primary' : 'btn'} relative px-1 text-sm`}
+                  onClick={() => setPanel(key)}
+                >
+                  {text}
+                  {key === 'chat' && unread > 0 && (
+                    <span aria-hidden="true" className="absolute -right-1 -top-1 min-w-[1.1rem] h-[1.1rem] rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-[1.1rem] text-white">
+                      {unread > 99 ? '99+' : unread}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+            {view.viewer >= 0 && (
+              <div
+                id="room-hint"
+                role="tabpanel"
+                aria-labelledby="room-tab-hint"
+                className={`min-w-0 xl:flex-1 xl:min-h-0 xl:overflow-y-auto ${shown === 'hint' ? '' : 'hidden'}`}
+              >
+                <HintPanel
+                  enabled={room.hints}
+                  myTurn={myTurn && view.phase === 'main'}
+                  loading={g.hintLoading}
+                  hint={g.hint}
+                  onRequest={g.requestHint}
+                  onFocus={(i) => {
+                    setFocus(i)
+                    if (!window.matchMedia(LANDSCAPE_QUERY).matches)
+                      document.getElementById('room-board')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }}
+                  focus={focus}
+                  lastReview={g.lastReview}
+                  seatName={(s) => seatLabel(room, s)}
+                />
+                {room.hints && g.reviews.length > 0 && (
+                  <div className="mt-2">
+                    <ReviewSummary reviews={g.reviews} />
+                  </div>
+                )}
+              </div>
+            )}
+            <div
+              id="room-chat"
+              role="tabpanel"
+              aria-labelledby="room-tab-chat"
+              className={`flex min-h-0 flex-col xl:flex-1 ${shown === 'chat' ? '' : 'hidden'}`}
+            >
+              <Chat chat={g.chat} onSend={g.sendChat} className="h-64 xl:h-auto xl:flex-1 xl:text-sm" />
             </div>
-          </aside>
-        )}
+            <div
+              id="room-log"
+              role="tabpanel"
+              aria-labelledby="room-tab-log"
+              className={`flex min-h-0 flex-col xl:flex-1 ${shown === 'log' ? '' : 'hidden'}`}
+            >
+              <EventLog log={g.log} className="h-64 xl:h-auto xl:flex-1 xl:min-h-0" />
+            </div>
+          </div>
+        </aside>
       </div>
-      {chatOpen && <ChatDialog chat={g.chat} onSend={g.sendChat} onClose={() => setChatOpen(false)} />}
-      {logOpen && <LogDialog log={g.log} onClose={() => setLogOpen(false)} />}
       {g.gameOver && showOver && (
         <GameOverModal
           over={g.gameOver}
